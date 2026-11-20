@@ -1,0 +1,21 @@
+# Liste blanche : seul notre code est versionné. Les fichiers du jeu (GOG),
+# les sauvegardes, node_modules et les anciens essais restent hors du dépôt.
+/*
+!/.gitignore
+!/README.md
+!/lancer.sh
+!/lancer-alis.sh
+!/lancer-web.sh
+!/lancer-web-alis.sh
+!/dosbox-mac.conf
+!/web/
+/web/*
+!/web/serve.py
+!/web/index.html
+!/web/dosbox.html
+!/web/dosbox.conf
+!/web/build-bundle.sh
+!/web/package.json
+!/web/package-lock.json
+!/web/alis/
+.DS_Store

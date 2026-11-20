@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ishar 3</title>
+  <link rel="stylesheet" href="node_modules/js-dos/dist/js-dos.css">
+  <script src="node_modules/js-dos/dist/js-dos.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #dos { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="dos"></div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const SAVE_URL = "saves/ishar3.changes";
+
+    // --- Sauvegardes : stockées sur le disque (web/saves/) via serve.py ---
+    let dosCi = null;                 // interface js-dos, prête après "ci-ready"
+    let lastSaved = null;
+    const sameBytes = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
+    async function pushChanges(data) {
+      if (!data || sameBytes(data, lastSaved)) return;
+      const r = await fetch(SAVE_URL, { method: "PUT", body: data });
+      if (r.ok) lastSaved = data;
+    }
+    async function autoSave() {
+      if (!dosCi) return;
+      try { await pushChanges(await dosCi.persist(true)); } catch (e) { console.error("autosave", e); }
+    }
+    setInterval(autoSave, 15000);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) autoSave(); });
+
+    // --- ZQSD → flèches (Maj+ZQSD envoie les vraies lettres) ---
+    const ZQSD = { z: 265, s: 264, q: 263, d: 262 };   // codes js-dos : haut, bas, gauche, droite
+    const held = new Map();                            // e.code → code flèche envoyé
+    function onKey(e, down) {
+      if (!dosCi) return;
+      let arrow = held.get(e.code);
+      if (down) {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+        arrow = ZQSD[e.key.toLowerCase()];
+        if (!arrow) return;
+        held.set(e.code, arrow);
+        if (!e.repeat) dosCi.sendKeyEvent(arrow, true);
+      } else {
+        if (!arrow) return;
+        held.delete(e.code);
+        dosCi.sendKeyEvent(arrow, false);
+      }
+      e.stopImmediatePropagation(); e.preventDefault();
+    }
+    window.addEventListener("keydown", e => onKey(e, true), true);
+    window.addEventListener("keyup", e => onKey(e, false), true);
+
+    Dos(document.getElementById("dos"), {
+      url: params.get("bundle") || ("ishar3.jsdos?v=" + Date.now()),
+      pathPrefix: "node_modules/js-dos/dist/emulators/",
+      backend: params.get("backend") || "dosbox",
+      autoStart: true,
+      autoSave: true,
+      noCloud: true,
+      kiosk: false,
+      theme: "dark",
+      renderAspect: "4/3",
+      imageRendering: "pixelated",
+      mouseCapture: params.get("capture") === "1",
+      noCursor: params.get("cursor") !== "1",   // curseur système masqué (?cursor=1 pour l'afficher)
+      fsChanges: {
+        urlToKey: () => SAVE_URL,
+        pull: async () => {
+          const r = await fetch(SAVE_URL);
+          if (!r.ok) return null;
+          lastSaved = new Uint8Array(await r.arrayBuffer());
+          return lastSaved;
+        },
+        push: async (_key, data) => pushChanges(data),
+      },
+      onEvent: (event, ci) => { if (event === "ci-ready") { dosCi = ci; window.ci = ci; window.dosLog = []; ci.events().onMessage((type, ...args) => window.dosLog.push(type + " " + args.join(" "))); } },
+    });
+  </script>
+</body>
+</html>
