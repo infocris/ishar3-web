@@ -102,7 +102,7 @@ index d31d91a..44f9eba 100644
              {
                  unpackmode = 1;
 diff --git a/src/opcodes.c b/src/opcodes.c
-index 1151bed..96e5033 100644
+index 1151bed..da436fb 100644
 --- a/src/opcodes.c
 +++ b/src/opcodes.c
 @@ -5503,6 +5503,8 @@ static void cmouse(void)
@@ -124,7 +124,7 @@ index 1151bed..96e5033 100644
  {
      u8 c;
      char *ptr = alis.sd7;
-+    sys_text_entry = 1;                 // saisie bloquante en cours (lue par em_text_input)
++    sys_text_entry = 1;                 // blocking text input in progress (read by em_text_input)
      while (alis.state && (c = io_getkey()) != '\r')
      {
          if (c == '\b')
@@ -140,7 +140,7 @@ index 1151bed..96e5033 100644
  {
      u8 c;
      char *ptr = alis.sd7;
-+    sys_text_entry = 1;                 // saisie bloquante en cours (lue par em_text_input)
++    sys_text_entry = 1;                 // blocking text input in progress (read by em_text_input)
      while (alis.state && (c = io_getkey()) != '\r')
      {
          if (c == '\b')
@@ -153,7 +153,7 @@ index 1151bed..96e5033 100644
  
  // Codopname no. 178 opcode 0xb1 csinput
 diff --git a/src/opernames.c b/src/opernames.c
-index d3b0040..81dc890 100644
+index d3b0040..3ae176e 100644
 --- a/src/opernames.c
 +++ b/src/opernames.c
 @@ -836,9 +836,30 @@ void onot(void)
@@ -167,8 +167,8 @@ index d3b0040..81dc890 100644
  {
      alis.varD7 = alis.automode ? alis.prevkey : (alis.prevkey = io_inkey());
 +
-+    // ZQSD : les lettres ne deviennent des flèches que lorsque le script principal lit le clavier
-+    // (exploration). Une saisie de texte (nom de sauvegarde, gesort.IO) suspend MAIN.IO.
++    // ZQSD: letters only become arrows while the main script reads the keyboard
++    // (exploration). Text input (save name, gesort.IO) suspends MAIN.IO.
 +    {
 +        static void *last_script;
 +        static int is_main, is_io;
@@ -177,12 +177,12 @@ index d3b0040..81dc890 100644
 +            last_script = alis.script;
 +            is_main = alis.script && alis.script->name && strncasecmp(alis.script->name, "main.", 5) == 0;
 +            is_io = alis.script && alis.script->name && (strncasecmp(alis.script->name, "io.", 3) == 0
-+                    || strncasecmp(alis.script->name, "textin", 6) == 0);   // saisie : nom de sauvegarde, contrôle du manuel
++                    || strncasecmp(alis.script->name, "textin", 6) == 0);   // text input: save name, manual check
 +        }
 +        if (is_main)
 +            sys_zqsd_game_poll();
 +        else if (is_io)
-+            sys_zqsd_text_poll();   // menu disque io.IO au clavier : nom de sauvegarde (souris/gesort lisent aussi, toujours)
++            sys_zqsd_text_poll();   // io.IO disk menu from the keyboard: save name (mouse/gesort always read too)
 +    }
      ALIS_DEBUG(EDebugInfo, " [%d] ", alis.varD7);
  }
@@ -194,8 +194,8 @@ index d3b0040..81dc890 100644
 +extern volatile int sys_text_entry;
  void ogetkey(void)
  {
-+    // Attente bloquante d'une touche (typhus.IO : mot du contrôle du manuel) : les lettres
-+    // tapées restent des lettres (pas de ZQSD -> flèches, qui ferait aussi bouger l'équipe).
++    // Blocking wait for a key (typhus.IO: manual check word): typed letters
++    // stay letters (no ZQSD -> arrows, which would also move the party).
 +    int was = sys_text_entry;
 +    sys_text_entry = 1;
      alis.varD7 = io_getkey();
@@ -470,7 +470,7 @@ index 3b9d3b6..f58c1db 100644
 +extern s32 boot_load_state;    // 1 = waiting for the title menu, 2 = waiting for the slot menu
 +void boot_load_hook(void);     // Ishar 3: --skip-intro goes straight to the title screen           // Ishar 3: --lang=fr|en|de|es skips the flag screen
 diff --git a/src/sys/sys.c b/src/sys/sys.c
-index 89651c2..4a7d6d9 100644
+index 89651c2..d4f11dc 100644
 --- a/src/sys/sys.c
 +++ b/src/sys/sys.c
 @@ -1,3 +1,4 @@
@@ -482,8 +482,8 @@ index 89651c2..4a7d6d9 100644
      dirty_rects[dirty_len++] = (rect_t){ .x = x, .y = y, .w = w, .h = h };
  }
  
-+int sys_zqsd_sc(int scancode);   // ZQSD = flèches (défini plus bas, SDL2)
-+int sys_test_held_sc = -1;       // touche tenue par le crochet de test ALIS_KEYS (trace native)
++int sys_zqsd_sc(int scancode);   // ZQSD = arrows (defined below, SDL2)
++int sys_test_held_sc = -1;       // key held by the ALIS_KEYS test hook (native trace)
 +
  #if ALIS_SDL_VER == 1
  
@@ -492,12 +492,12 @@ index 89651c2..4a7d6d9 100644
  #undef MIX_RUN
  #endif
  
-+// Volumes réglables (256 = 100 %) : musique et effets sonores séparés.
-+// Le callback garde une copie du tampon après la musique ; les effets sont la différence.
++// Adjustable volumes (256 = 100 %): music and sound effects separately.
++// The callback keeps a copy of the buffer after the music; effects are the difference.
 +int alis_vol_music = 256, alis_vol_sfx = 256;
 +#define kVolSnapLen 32768
 +static u16 volsnap[kVolSnapLen];
-+static u32 volpeak[2];   // pics récents musique / effets (diagnostic)
++static u32 volpeak[2];   // recent music / effects peaks (diagnostics)
 +#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
 +EMSCRIPTEN_KEEPALIVE void em_set_volume(int music, int sfx)
@@ -560,8 +560,8 @@ index 89651c2..4a7d6d9 100644
      if (alis.platform.uid == EGameRobinsonsRequiem3DO)
          return key3do(button.sym);
 +
-+    // Ishar 3 PC : START.EXE traduit les scancodes par sa table (fichier +0x173ab) ; flèches et
-+    // pavé numérique partagent le scancode, donc les flèches valent des chiffres ('8' = avancer).
++    // Ishar 3 PC: START.EXE translates scancodes through its table (file +0x173ab); arrows and
++    // keypad share the scancode, so arrows act as digits ('8' = forward).
 +    if (alis.platform.uid == EGameIshar_3 && alis.platform.kind == EPlatformPC)
 +    {
 +        switch (button.sym)
@@ -607,28 +607,28 @@ index 89651c2..4a7d6d9 100644
  
 +
 +#if !defined(ALIS_USE_NATIVE_ATARI) && ALIS_SDL_VER > 1
-+// ZQSD (clavier AZERTY) = flèches. Z/Q/S/D sans Maj sont réécrits en flèches dès l'arrivée de
-+// l'événement SDL ; Maj+lettre garde la lettre (saisie de texte). zqsd_held[] reflète l'état
-+// enfoncé pour les lectures d'état (SDL_GetKeyboardState ne connaît que la vraie touche).
-+static volatile u8 zqsd_held[4];                    // haut, bas, gauche, droite
++// ZQSD (AZERTY keyboard) = arrows. Z/Q/S/D without Shift become arrows as soon as the SDL
++// event arrives; Shift+letter keeps the letter (text input). zqsd_held[] mirrors the pressed
++// state for state reads (SDL_GetKeyboardState only knows the real key).
++static volatile u8 zqsd_held[4];                    // up, down, left, right
 +static const SDL_Scancode zqsd_sc[4] = { SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT };
 +static const SDL_Keycode  zqsd_sym[4] = { SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT };
 +
-+static volatile u32 zqsd_main_poll;                // dernier oinkey de MAIN.IO (ms SDL)
++static volatile u32 zqsd_main_poll;                // last MAIN.IO oinkey (SDL ms)
 +
 +void sys_zqsd_game_poll(void)
 +{
 +    zqsd_main_poll = SDL_GetTicks();
 +}
 +
-+// Millisecondes depuis la dernière lecture du clavier par MAIN.IO (le joueur a la main).
++// Milliseconds since MAIN.IO last read the keyboard (the player has control).
 +u32 sys_zqsd_main_age(void)
 +{
 +    return (u32)(SDL_GetTicks() - zqsd_main_poll);
 +}
 +
-+// io.IO lit le clavier (menu disque, saisie du nom de
-+// sauvegarde ; MAIN.IO continue de lire en parallèle) : le joueur tape du texte, pas de remappage.
++// io.IO reads the keyboard (disk menu, typing the save
++// name; MAIN.IO keeps reading in parallel): the player types text, no remapping.
 +static volatile u32 zqsd_text_poll;
 +void sys_zqsd_text_poll(void)
 +{
@@ -638,7 +638,7 @@ index 89651c2..4a7d6d9 100644
 +    zqsd_text_poll = SDL_GetTicks();
 +}
 +
-+volatile int sys_text_entry;                 // getstring/getval en cours (opcodes.c)
++volatile int sys_text_entry;                 // getstring/getval in progress (opcodes.c)
 +
 +int sys_io_menu_open(void)
 +{
@@ -660,22 +660,22 @@ index 89651c2..4a7d6d9 100644
 +    }
 +    if (down)
 +    {
-+        // déjà convertie (répétition) : on reste sur la flèche jusqu'au relâchement
++        // already converted (repeat): stay on the arrow until release
 +        if (!zqsd_held[dir])
 +        {
 +            if (ks->mod & (KMOD_SHIFT | KMOD_CTRL | KMOD_ALT | KMOD_GUI))
 +                return 0;
 +            if ((u32)(SDL_GetTicks() - zqsd_main_poll) > 500)
-+                return 0;   // le script principal ne lit pas le clavier : saisie de texte, menu...
++                return 0;   // the main script is not reading the keyboard: text input, menu...
 +            if (sys_io_menu_open())
-+                return 0;   // menu disque : nom de sauvegarde
++                return 0;   // disk menu: save name
 +        }
 +        zqsd_held[dir] = 1;
 +    }
 +    else
 +    {
 +        if (!zqsd_held[dir])
-+            return 0;       // appui laissé en lettre : relâchement en lettre aussi
++            return 0;       // press left as a letter: release as a letter too
 +        zqsd_held[dir] = 0;
 +    }
 +    ks->sym = zqsd_sym[dir];
@@ -705,14 +705,14 @@ index 89651c2..4a7d6d9 100644
      switch (code)
      {
 diff --git a/src/sys/sys_sdl2.c b/src/sys/sys_sdl2.c
-index 9783d8a..24b1493 100644
+index 9783d8a..d4d95e0 100644
 --- a/src/sys/sys_sdl2.c
 +++ b/src/sys/sys_sdl2.c
 @@ -104,6 +104,12 @@ void sys_audio_callback_S8(void *userdata, u8 *stream, s32 len);
  #pragma mark - SDL2 System init
  // ============================================================================
  
-+// Curseur logiciel (voir sys_dirty_mouse / sys_render)
++// Software cursor (see sys_dirty_mouse / sys_render)
 +static SDL_mutex   *soft_cursor_lock;
 +static u32         *soft_cursor_pixels;
 +static int          soft_cursor_w, soft_cursor_h, soft_cursor_dirty;
@@ -752,7 +752,7 @@ index 9783d8a..24b1493 100644
      }
      
 +#ifdef __EMSCRIPTEN__
-+    // Navigateur : le fil principal ne doit jamais bloquer ; la VM tourne dans un worker.
++    // Browser: the main thread must never block; the VM runs in a worker.
 +    emscripten_set_main_loop(sys_em_tick, 0, 1);
 +#endif
      while (alis.state && !failure)
@@ -836,7 +836,7 @@ index 9783d8a..24b1493 100644
                          ALIS_DEBUG(EDebugSystem, "INTERRUPT: User debug label.\n");
                          break;
  
-+#ifndef __EMSCRIPTEN__                  // F9 = attaque du personnage IV dans Ishar 3 (web)
++#ifndef __EMSCRIPTEN__                  // F9 = character IV attack in Ishar 3 (web)
                      case SDLK_F9:
                      {
                          static int wav_recording = 0;
@@ -854,7 +854,7 @@ index 9783d8a..24b1493 100644
      dirty_len = 0;
 +#ifdef __EMSCRIPTEN__
 +    if (SDL_SemTryWait(render_sem) != 0)
-+        return;   // la VM dessine : on saute cette image plutôt que de bloquer le navigateur
++        return;   // the VM is drawing: skip this frame rather than block the browser
 +#else
      SDL_SemWait(render_sem);
 +#endif
@@ -866,7 +866,7 @@ index 9783d8a..24b1493 100644
      SDL_RenderClear(renderer);
      SDL_RenderCopy(renderer, texture, NULL, NULL);
 +
-+    // curseur logiciel, en coordonnées logiques (largeur x hauteur*aspect)
++    // software cursor, in logical coordinates (width x height*aspect)
 +    SDL_LockMutex(soft_cursor_lock);
 +    if (soft_cursor_dirty)
 +    {
@@ -951,8 +951,8 @@ index 9783d8a..24b1493 100644
 -    
 -    SDL_SetCursor(cursor);
 -    SDL_ShowCursor(mouse.enabled);
-+    // Curseur logiciel : l'image est incrustée dans le rendu (sys_render) à sa taille d'origine,
-+    // au lieu d'un curseur système agrandi que macOS agrandit encore (accessibilité).
++    // Software cursor: the image is blended into the render (sys_render) at its native size,
++    // instead of an enlarged system cursor that macOS enlarges further (accessibility).
 +    SDL_LockMutex(soft_cursor_lock);
 +    free(soft_cursor_pixels);
 +    soft_cursor_pixels = pixels;
@@ -969,17 +969,17 @@ index 9783d8a..24b1493 100644
  #endif
 +
 +#ifdef __EMSCRIPTEN__
-+// --- Accès à la mémoire de la VM depuis la page (minimap) ---------------------------------
++// --- VM memory access from the page (minimap) --------------------------------------------
 +EMSCRIPTEN_KEEPALIVE u8 *em_vm_mem(void) { return alis.mem; }
 +EMSCRIPTEN_KEEPALIVE u32 em_vm_finmem(void) { return alis.finmem; }
 +EMSCRIPTEN_KEEPALIVE u32 em_vm_basemain(void) { return (u32)alis.basemain; }
 +u32 sys_zqsd_main_age(void);
-+// 1 si le joueur a la main (MAIN.IO lit le clavier) : la minimap ne révèle que dans ce cas
++// 1 if the player has control (MAIN.IO reads the keyboard): the minimap only reveals then
 +int sys_io_menu_open(void);
-+EMSCRIPTEN_KEEPALIVE int em_text_input(void) { return sys_io_menu_open(); }   // saisie de texte en cours (io.IO, textin.IO)
++EMSCRIPTEN_KEEPALIVE int em_text_input(void) { return sys_io_menu_open(); }   // text input in progress (io.IO, textin.IO)
 +EMSCRIPTEN_KEEPALIVE int em_player_control(void) { return sys_zqsd_main_age() < 500 && !alis.automode && !sys_io_menu_open(); }
 +EMSCRIPTEN_KEEPALIVE int em_automode(void) { return alis.automode; }
-+// i-ème script vivant : nom (ou NULL) ; *vram reçoit vram_org
++// i-th live script: name (or NULL); *vram receives vram_org
 +EMSCRIPTEN_KEEPALIVE const char *em_vm_script(int i, u32 *vram)
 +{
 +    if (i < 0 || i >= MAX_SCRIPTS || !alis.live_scripts[i] || !alis.live_scripts[i]->name)
