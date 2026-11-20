@@ -1,4 +1,6 @@
 #!/bin/zsh
+# Builds alis.js / alis.wasm with Emscripten. Run from an ALIS checkout (alis-src) with
+# alis-emscripten.patch applied; output goes to ./build-wasm (or the directory given as $1).
 set -e
 OUT=${1:-build-wasm}; mkdir -p $OUT/obj
 SRCS=(${(f)"$(find src -name '*.c' | grep -v -e sys_sdl1.c -e sys_atari)"})

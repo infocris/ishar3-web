@@ -17,8 +17,8 @@
     const params = new URLSearchParams(location.search);
     const SAVE_URL = "saves/ishar3.changes";
 
-    // --- Sauvegardes : stockées sur le disque (web/saves/) via serve.py ---
-    let dosCi = null;                 // interface js-dos, prête après "ci-ready"
+    // --- Saves: stored on disk (web/saves/) through serve.py ---
+    let dosCi = null;                 // js-dos command interface, ready after "ci-ready"
     let lastSaved = null;
     const sameBytes = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
     async function pushChanges(data) {
@@ -33,9 +33,9 @@
     setInterval(autoSave, 15000);
     document.addEventListener("visibilitychange", () => { if (document.hidden) autoSave(); });
 
-    // --- ZQSD → flèches (Maj+ZQSD envoie les vraies lettres) ---
-    const ZQSD = { z: 265, s: 264, q: 263, d: 262 };   // codes js-dos : haut, bas, gauche, droite
-    const held = new Map();                            // e.code → code flèche envoyé
+    // --- ZQSD → arrow keys (Shift+ZQSD sends the actual letters) ---
+    const ZQSD = { z: 265, s: 264, q: 263, d: 262 };   // js-dos key codes: up, down, left, right
+    const held = new Map();                            // e.code → arrow code sent
     function onKey(e, down) {
       if (!dosCi) return;
       let arrow = held.get(e.code);
@@ -67,7 +67,7 @@
       renderAspect: "4/3",
       imageRendering: "pixelated",
       mouseCapture: params.get("capture") === "1",
-      noCursor: params.get("cursor") !== "1",   // curseur système masqué (?cursor=1 pour l'afficher)
+      noCursor: params.get("cursor") !== "1",   // system cursor hidden (?cursor=1 to show it)
       fsChanges: {
         urlToKey: () => SAVE_URL,
         pull: async () => {
