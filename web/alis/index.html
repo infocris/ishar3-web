@@ -164,6 +164,7 @@
     <div class="info" id="walkMsg" style="display:none"></div>
     <button id="openMap" type="button">Agrandir la carte (Tab)</button>
     <button id="openOpts" type="button">Options (carte, affichage, clavier, démarrage)</button>
+    <button id="openCheat" type="button">Triche (temps, vie)</button>
     <button id="openJournal" type="button">Journal des dialogues</button>
     <button id="openParty" type="button">Équipe : fiches, sorts, objets, boutiques</button>
     <div id="shopBox" style="display:none">
@@ -214,6 +215,16 @@
         <label for="bootNoManual" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootNoManual"> Désactiver le contrôle du manuel (portes : toute réponse acceptée)</label>
         <label for="bootPassersby" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootPassersby"> Passants dans la ville (comme la version disquette)</label>
       </div>
+  </div></div>
+  <div id="cmodal" class="odlg" role="dialog" aria-label="Triche"><div class="box">
+    <div class="bar"><h3>Triche</h3><button id="closeCheat" type="button">Fermer (Échap)</button></div>
+    <h2>Temps</h2>
+    <div class="info" id="cheatClock">Pas d'horloge ici (menu ou cinématique).</div>
+    <div id="timeBtns" style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-h="1">+1 h</button><button type="button" data-h="3">+3 h</button><button type="button" data-h="morning">→ 6 h (matin)</button><button type="button" data-h="evening">→ 21 h (soir)</button></div>
+    <h2>Vie</h2>
+    <div class="info dim">Vitalité au maximum, physique (faim) et psychique à 100 pour les membres vivants.</div>
+    <button id="healAll" type="button">Soigner toute l'équipe</button>
+    <div class="info" id="cheatMsg"></div>
   </div></div>
   <div id="jmodal" class="odlg" role="dialog" aria-label="Journal des dialogues"><div class="box" style="width:min(620px,94vw)">
     <div class="bar"><h3>Journal des dialogues</h3><button id="jcopy" type="button">Copier</button><button id="jclear" type="button">Effacer</button><button id="closeJournal" type="button">Fermer (Échap)</button></div>
@@ -722,13 +733,15 @@
     modalEl.addEventListener("click", e => { if (e.target === modalEl) closeMap(); });
     // Options dialog (map, display, start-up, sound): Escape or a click outside closes it.
     // The dialogue log uses the same dialog style and keys.
-    const omodalEl = document.getElementById("omodal"), jmodalEl = document.getElementById("jmodal");
-    const dlgOpen = () => omodalEl.classList.contains("open") || jmodalEl.classList.contains("open");
-    const closeOpts = () => { omodalEl.classList.remove("open"); jmodalEl.classList.remove("open"); Module.canvas.focus(); };
+    const omodalEl = document.getElementById("omodal"), jmodalEl = document.getElementById("jmodal"), cmodalEl = document.getElementById("cmodal");
+    const DLGS = [omodalEl, jmodalEl, cmodalEl];
+    const dlgOpen = () => DLGS.some(el => el.classList.contains("open"));
+    const closeOpts = () => { for (const el of DLGS) el.classList.remove("open"); Module.canvas.focus(); };
+    document.getElementById("openCheat").addEventListener("click", () => { document.getElementById("cheatMsg").textContent = ""; cmodalEl.classList.add("open"); });
     document.getElementById("openOpts").addEventListener("click", () => omodalEl.classList.add("open"));
     document.getElementById("openJournal").addEventListener("click", () => { renderJournal(); jmodalEl.classList.add("open"); });
-    for (const id of ["closeOpts", "closeJournal"]) document.getElementById(id).addEventListener("click", closeOpts);
-    for (const el of [omodalEl, jmodalEl]) el.addEventListener("click", e => { if (e.target === el) closeOpts(); });
+    for (const id of ["closeOpts", "closeJournal", "closeCheat"]) document.getElementById(id).addEventListener("click", closeOpts);
+    for (const el of DLGS) el.addEventListener("click", e => { if (e.target === el) closeOpts(); });
     // Tab opens/closes; Escape closes. While the modal is open, keys do not reach the game.
     // Page fields (filter, language, volumes): keys do not go to the game.
     for (const type of ["keydown", "keypress", "keyup"]) window.addEventListener(type, e => {
@@ -1942,14 +1955,38 @@
     let clockKey = "";
     function updateClock(v, on) {
       const A = v && v.m + v.base, h = on ? v.H[A + 0x3c08] : 99, f = on ? v.H[A + 0x3c0c] | v.H[A + 0x3c0d] << 8 : 0;
-      if (!on || h > 23 || f > 2047) { if (clockKey) { clockEl.style.display = "none"; clockKey = ""; } return; }
+      if (!on || h > 23 || f > 2047) { if (clockKey) { clockEl.style.display = "none"; cheatClockEl.textContent = "Pas d'horloge ici (menu ou cinématique)."; clockKey = ""; } return; }
       const mn = Math.floor(f * 60 / 2048), key = h + ":" + mn;
       if (key === clockKey) return; clockKey = key;
       const open = h >= 6 && h < 21, night = h >= 21 || h < 6;
       const shops = open ? `boutiques ouvertes (ferment à 21 h, dans ${fmtDur((21 - h) * 60 - mn)})` : `boutiques fermées (ouvrent à 6 h, dans ${fmtDur(((30 - h) % 24) * 60 - mn)})`;
       clockEl.innerHTML = `<b style="color:#e8c070;font-size:15px">${night ? "☾" : "☀"} ${h} h ${String(mn).padStart(2, "0")}</b> · ${night ? "nuit" : "jour"}<br><span style="color:#8f826c">${shops}</span>`;
-      clockEl.style.display = "";
+      clockEl.style.display = ""; cheatClockEl.innerHTML = clockEl.innerHTML;
     }
+    // Time buttons: the clock is set half a second before the target hour, so that the game's own
+    // hour change (day/night lighting…) runs when it reaches it.
+    const timeBtnsEl = document.getElementById("timeBtns"), cheatClockEl = document.getElementById("cheatClock");
+    timeBtnsEl.addEventListener("click", e => {
+      const b = e.target.closest("button[data-h]"), v = vm(); if (!b || !v) return;
+      const A = v.m + v.base, h = v.H[A + 0x3c08]; if (h > 23) return;
+      const to = /^\d+$/.test(b.dataset.h) ? (h + +b.dataset.h) % 24 : b.dataset.h === "morning" ? 6 : 21;
+      // just before the target hour: the game itself crosses it a moment later and runs its hour change
+      v.H[A + 0x3c08] = (to + 23) % 24; v.H[A + 0x3c0c] = 2040 & 255; v.H[A + 0x3c0d] = 2040 >> 8;
+      clockKey = "";
+    });
+    // Heal: vitality word MAIN+0x16e0 ← maximum +0x1700, physique +0x18e2 and psyche +0x18d6 ← 100 (living members only).
+    document.getElementById("healAll").addEventListener("click", () => {
+      const v = vm(), party = v && readParty(v), msg = document.getElementById("cheatMsg");
+      if (!party || !party.length) { msg.textContent = "Pas d'équipe en jeu."; return; }
+      const A = v.m + v.base, healed = [];
+      for (const c of party) {
+        if (c.vit <= 0) continue;
+        v.H[A + 0x16e0 + 2 * c.slot] = c.vitMax & 255; v.H[A + 0x16e0 + 2 * c.slot + 1] = c.vitMax >> 8;
+        v.H[A + 0x18e2 + c.slot] = 100; v.H[A + 0x18d6 + c.slot] = 100; healed.push(c.name);
+      }
+      const dead = party.filter(c => c.vit <= 0).map(c => c.name);
+      msg.textContent = (healed.length ? "Soignés : " + healed.join(", ") + "." : "Personne à soigner.") + (dead.length ? " Morts (non ressuscités) : " + dead.join(", ") + "." : "");
+    });
     // Town passersby (--passersby): the CD MAIN.IO only starts affpv.IO when the zone changes
     // (zone MAIN+0x3b33 differs from the last handled zone, byte MAIN+0x3dba). After loading
     // a save in town nothing changes until the party crosses a border, so the town stays
