@@ -1,13 +1,13 @@
 # Local HTTP server for Ishar 3 (js-dos and ALIS/WebAssembly).
 # - No caching: the browser always reloads the latest files.
 # - COOP/COEP headers: required by ALIS's WebAssembly threads (SharedArrayBuffer).
-# - GET  /game/<file>           : game files (parent directory of web/).
+# - GET  /game/<file>           : game files ($ISHAR3_GAME, default: game/ next to web/).
 # - GET  /saves-list/<folder>   : JSON list of the saves in web/saves/<folder>/.
 # - PUT  /saves/[<folder>/]<name> : writes a save to disk.
 import http.server, json, os, re, sys, urllib.parse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-GAME = os.path.dirname(ROOT)
+GAME = os.environ.get("ISHAR3_GAME") or os.path.join(os.path.dirname(ROOT), "game")
 SAVES = os.path.join(ROOT, "saves")
 GAME_EXT = re.compile(r"\.(IO|FIC|DAT|EXE|STP|TST)$", re.I)
 SAFE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")

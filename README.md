@@ -5,8 +5,10 @@ Ishar 3 (Silmarils, French DOS release from GOG) playable in a web browser with
 engine, compiled to WebAssembly. The page adds a map, auto-walk, teleport, party status,
 shop and inn panels, auto-attack and more. The game and the page UI are in French.
 
-**Game files are not included.** You need to own Ishar 3 (GOG) and put this repository in
-the game folder (next to `MAIN.IO`, `*.IO`, `*.FIC`, `*.DAT`…).
+**Game files are not included.** You need to own Ishar 3 (GOG) and copy its install folder
+(`MAIN.IO`, `*.IO`, `*.FIC`, `*.DAT`…) to `game/` (ignored by git), or point the
+`ISHAR3_GAME` environment variable to it. The title menu also needs the empty marker files
+`INTRO150.DAT` and `LOGO150.DAT` in that folder.
 
 ## Run
 
