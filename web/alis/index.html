@@ -1818,11 +1818,26 @@
       clockEl.innerHTML = `<b style="color:#e8c070;font-size:15px">${night ? "☾" : "☀"} ${h} h ${String(mn).padStart(2, "0")}</b> · ${night ? "nuit" : "jour"}<br><span style="color:#8f826c">${shops}</span>`;
       clockEl.style.display = "";
     }
+    // Town passersby (--passersby): the CD MAIN.IO only starts affpv.IO when the zone changes
+    // (zone MAIN+0x3b33 differs from the last handled zone, byte MAIN+0x3dba). After loading
+    // a save in town nothing changes until the party crosses a border, so the town stays
+    // empty. When the player has control in town (Cont 1-2) and affpv is not running, clear
+    // the last handled zone: MAIN runs its zone-change code (preload the zone's passersby,
+    // start affpv) and stores the zone back. At most once every 10 s.
+    let pvTick = 0, pvKick = 0;
+    function kickPassersby(v) {
+      if (!boot.passersby || !v || pvTick-- > 0) return; pvTick = 60;
+      const A = v.m + v.base, cont = v.H[A + 0x14b9], zone = v.H[A + 0x3b33];
+      if ((cont !== 1 && cont !== 2) || !zone || v.H[A + 0x3dba] !== zone || Date.now() - pvKick < 10000) return;
+      if (!Module._em_player_control || !Module._em_player_control() || liveScripts().some(x => x.name === "affpv.io")) return;
+      v.H[A + 0x3dba] = 0; pvKick = Date.now();
+    }
     const fmtDur = m => m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`;
     function drawMinimap() {
       const v = vm();
       updateParty(v);
       updateFoes(v);
+      kickPassersby(v);
       if (v && levelTick-- <= 0) { lastLevel = levelName(); levelTick = 30; }
       const mp = v && lastLevel && readMap(v);
       updateClock(v, !!mp);
