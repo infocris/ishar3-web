@@ -62,6 +62,53 @@ index f19015c..b5c3260 100644
      }
      else
      {
+diff --git a/src/image.c b/src/image.c
+index 26375e3..4f73fa5 100644
+--- a/src/image.c
++++ b/src/image.c
+@@ -2584,6 +2584,33 @@ void put_char(s8 character)
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// --- Text log for the page: every string drawn on screen (charmode 2) is appended to a ring buffer
++// as "<script>\x1f<text>\x1e"; the page polls em_textlog_head() and reads the new bytes.
++#include <emscripten.h>
++#define TEXTLOG_SIZE 65536
++static u8 textlog[TEXTLOG_SIZE];
++static volatile u32 textlog_head;
++EMSCRIPTEN_KEEPALIVE u8 *em_textlog(void) { return textlog; }
++EMSCRIPTEN_KEEPALIVE u32 em_textlog_size(void) { return TEXTLOG_SIZE; }
++EMSCRIPTEN_KEEPALIVE u32 em_textlog_head(void) { return textlog_head; }
++static void textlog_put(const char *s, u8 end)
++{
++    u32 h = textlog_head;
++    for (; *s; s++) textlog[h++ % TEXTLOG_SIZE] = (u8)*s;
++    textlog[h++ % TEXTLOG_SIZE] = end;
++    textlog_head = h;
++}
++static void textlog_string(const char *text)
++{
++    if (!text[0]) return;
++    textlog_put(alis.script && alis.script->name ? alis.script->name : "?", 0x1f);
++    textlog_put(text, 0x1e);
++}
++#else
++#define textlog_string(t)
++#endif
++
+ void put_string(void)
+ {
+ #ifndef NDEBUG
+@@ -2632,6 +2659,8 @@ void put_string(void)
+         }
+     }
+ 
++    if (alis.charmode == 2)
++        textlog_string(alis.sd7);
+     for (char *strptr = alis.sd7; *strptr; strptr++)
+     {
+         put_char(*strptr);
 diff --git a/src/main.c b/src/main.c
 index d31d91a..d76b42e 100644
 --- a/src/main.c

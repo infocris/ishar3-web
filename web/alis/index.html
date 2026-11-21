@@ -20,16 +20,18 @@
     #panel button { font: 12px system-ui, sans-serif; color: #e8c070; background: #241e16; border: 1px solid #3a3226; border-radius: 4px; padding: 5px 8px; cursor: pointer; }
     #panel button:hover { background: #2f271c; }
     #full { cursor: zoom-in; }
-    #omodal { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; }
-    #omodal.open { display: flex; }
-    #omodal .box { background: #14110d; border: 1px solid #3a3226; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; width: min(440px, 94vw); max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
-    #omodal .bar { display: flex; align-items: center; gap: 12px; } #omodal h3 { margin: 0; flex: 1; font: 600 16px system-ui, sans-serif; color: #e8c070; }
-    #omodal h2 { margin: 6px 0 0; font: 600 14px system-ui, sans-serif; color: #e8c070; letter-spacing: .02em; }
-    #omodal .info { font-size: 12px; color: #a99c86; font-variant-numeric: tabular-nums; min-height: 1.2em; }
-    #omodal button { align-self: flex-start; font: 12px system-ui, sans-serif; color: #e8c070; background: #241e16; border: 1px solid #3a3226; border-radius: 4px; padding: 5px 8px; cursor: pointer; }
-    #omodal button:hover { background: #2f271c; }
-    #omodal select { font: 12px system-ui; color: #d8cbb0; background: #1c1712; border: 1px solid #3a3226; border-radius: 4px; padding: 2px 4px; }
-    #omodal #sound span { white-space: nowrap; }
+    .odlg { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; }
+    .odlg.open { display: flex; }
+    .odlg .box { background: #14110d; border: 1px solid #3a3226; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; width: min(440px, 94vw); max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
+    .odlg .bar { display: flex; align-items: center; gap: 12px; } .odlg h3 { margin: 0; flex: 1; font: 600 16px system-ui, sans-serif; color: #e8c070; }
+    .odlg h2 { margin: 6px 0 0; font: 600 14px system-ui, sans-serif; color: #e8c070; letter-spacing: .02em; }
+    .odlg .info { font-size: 12px; color: #a99c86; font-variant-numeric: tabular-nums; min-height: 1.2em; }
+    .odlg button { align-self: flex-start; font: 12px system-ui, sans-serif; color: #e8c070; background: #241e16; border: 1px solid #3a3226; border-radius: 4px; padding: 5px 8px; cursor: pointer; }
+    .odlg button:hover { background: #2f271c; }
+    #jlist { display: flex; flex-direction: column; gap: 8px; font: 13px/1.45 system-ui, sans-serif; color: #d8cbb0; min-height: 4em; }
+    #jlist .e { border-left: 2px solid #3a3226; padding-left: 8px; } #jlist .e .w { font-size: 11px; color: #8f826c; }
+    .odlg select { font: 12px system-ui; color: #d8cbb0; background: #1c1712; border: 1px solid #3a3226; border-radius: 4px; padding: 2px 4px; }
+    .odlg #sound span { white-space: nowrap; }
     #modal, #pmodal { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; }
     #modal.open, #pmodal.open { display: flex; }
     #modal .box, #pmodal .box { background: #14110d; border: 1px solid #3a3226; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; max-width: 96vw; max-height: 96vh; box-sizing: border-box; }
@@ -159,6 +161,7 @@
     <div class="info" id="walkMsg" style="display:none"></div>
     <button id="openMap" type="button">Agrandir la carte (Tab)</button>
     <button id="openOpts" type="button">Options (carte, affichage, démarrage, son)</button>
+    <button id="openJournal" type="button">Journal des dialogues</button>
     <button id="openParty" type="button">Équipe : fiches, sorts, objets, boutiques</button>
     <div id="shopBox" style="display:none">
       <h2>Boutique</h2>
@@ -184,7 +187,7 @@
     <div class="info" id="loadRow" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">Charger :</div>
     <div class="info dim" id="bootMsg"></div>
   </aside>
-  <div id="omodal" role="dialog" aria-label="Options"><div class="box">
+  <div id="omodal" class="odlg" role="dialog" aria-label="Options"><div class="box">
     <div class="bar"><h3>Options</h3><button id="closeOpts" type="button" class="x">Fermer (Échap)</button></div>
     <h2>Carte</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="revealAll"> Tout révéler</label>
@@ -211,6 +214,11 @@
         <label for="volMusic">Musique</label><input type="range" id="volMusic" min="0" max="200" step="5"><span id="volMusicV"></span>
         <label for="volSfx">Effets</label><input type="range" id="volSfx" min="0" max="200" step="5"><span id="volSfxV"></span>
       </div>
+  </div></div>
+  <div id="jmodal" class="odlg" role="dialog" aria-label="Journal des dialogues"><div class="box" style="width:min(620px,94vw)">
+    <div class="bar"><h3>Journal des dialogues</h3><button id="jcopy" type="button">Copier</button><button id="jclear" type="button">Effacer</button><button id="closeJournal" type="button">Fermer (Échap)</button></div>
+    <div class="info dim" id="jmsg">Textes affichés par le jeu depuis l'ouverture de l'onglet, les plus récents en haut.</div>
+    <div id="jlist"></div>
   </div></div>
   <div id="innTip" role="tooltip"></div>
   <div id="allSaves" role="dialog" aria-label="Toutes les sauvegardes"><div class="hd"><h4 id="allSavesT">Toutes les sauvegardes</h4><input id="allSavesQ" type="search" placeholder="Filtrer…"><button class="x" type="button" id="allSavesX">Fermer</button></div><div class="dim" id="allSavesHint"></div><div class="list" id="allSavesL"></div></div>
@@ -713,11 +721,14 @@
     fullCv.addEventListener("click", openMap);
     modalEl.addEventListener("click", e => { if (e.target === modalEl) closeMap(); });
     // Options dialog (map, display, start-up, sound): Escape or a click outside closes it.
-    const omodalEl = document.getElementById("omodal");
-    const closeOpts = () => { omodalEl.classList.remove("open"); Module.canvas.focus(); };
+    // The dialogue log uses the same dialog style and keys.
+    const omodalEl = document.getElementById("omodal"), jmodalEl = document.getElementById("jmodal");
+    const dlgOpen = () => omodalEl.classList.contains("open") || jmodalEl.classList.contains("open");
+    const closeOpts = () => { omodalEl.classList.remove("open"); jmodalEl.classList.remove("open"); Module.canvas.focus(); };
     document.getElementById("openOpts").addEventListener("click", () => omodalEl.classList.add("open"));
-    document.getElementById("closeOpts").addEventListener("click", closeOpts);
-    omodalEl.addEventListener("click", e => { if (e.target === omodalEl) closeOpts(); });
+    document.getElementById("openJournal").addEventListener("click", () => { renderJournal(); jmodalEl.classList.add("open"); });
+    for (const id of ["closeOpts", "closeJournal"]) document.getElementById(id).addEventListener("click", closeOpts);
+    for (const el of [omodalEl, jmodalEl]) el.addEventListener("click", e => { if (e.target === el) closeOpts(); });
     // Tab opens/closes; Escape closes. While the modal is open, keys do not reach the game.
     // Page fields (filter, language, volumes): keys do not go to the game.
     for (const type of ["keydown", "keypress", "keyup"]) window.addEventListener(type, e => {
@@ -728,7 +739,7 @@
     const isMoveKey = e => !e.ctrlKey && !e.metaKey && !e.altKey &&
       (/^Arrow/.test(e.key) || /^Digit[1-6]$/.test(e.code) || /^[zqsdae123456]$/.test((e.key || "").toLowerCase()));
     window.addEventListener("keydown", e => {
-      if (omodalEl.classList.contains("open")) {          // options open: Escape closes, the game gets nothing
+      if (dlgOpen()) {                                     // options or log open: Escape closes, the game gets nothing
         if (e.key === "Escape") closeOpts();
         e.stopImmediatePropagation(); if (e.key === "Escape" || e.key === "Tab") e.preventDefault();
         return;
@@ -747,7 +758,7 @@
     }, true);
     window.addEventListener("keyup", e => {
       if (modalEl.classList.contains("open") && isMoveKey(e)) return;     // movement key released: to the game as well
-      if (modalEl.classList.contains("open") || pmodalEl.classList.contains("open") || omodalEl.classList.contains("open") || e.key === "Tab") { e.stopImmediatePropagation(); e.preventDefault(); }
+      if (modalEl.classList.contains("open") || pmodalEl.classList.contains("open") || dlgOpen() || e.key === "Tab") { e.stopImmediatePropagation(); e.preventDefault(); }
     }, true);
 
     // Guard: reloading or closing the tab during a game asks the browser for confirmation
@@ -1498,6 +1509,53 @@
       let t = ""; for (const c of bytes) { if (!c) break; t += String.fromCharCode(c); }
       return t.replace(/[\[><=_^`]/g, c => ({ "[": "é", ">": "è", "<": "à", "=": "â", "_": "î", "^": "ê", "`": "û" })[c]).replace(/\b([A-Z]) /g, "$1");
     };
+    // --- Dialogue log: the engine appends every string drawn on screen to a ring buffer
+    // ("<script>\x1f<text>\x1e", alis-emscripten.patch, image.c). Lines printed close together
+    // by the same script form one message. Interface texts (menus, names, map title) are left out.
+    const JOURNAL_SKIP = /^(accueil|accueils|io|frise|main|textin|create|creates)\.io$/i;
+    const journal = (() => { try { return JSON.parse(sessionStorage.getItem("ishar3-journal") || "[]"); } catch { return []; } })();
+    let jAt = null, jOpen = null, jSaveT = 0;
+    function journalTick() {
+      const M = Module; if (!M._em_textlog_head) return;
+      const head = M._em_textlog_head() >>> 0, base = M._em_textlog(), size = M._em_textlog_size();
+      if (jAt === null || head - jAt > size) jAt = Math.max(0, head - size);
+      if (head === jAt) { if (jOpen && Date.now() - jOpen.t > 1500) closeMsg(); return; }
+      const bytes = []; for (let i = jAt; i < head; i++) bytes.push(M.HEAPU8[base + i % size]); jAt = head;
+      let rec = [], now = Date.now();
+      for (const b of bytes) {
+        if (b !== 0x1e) { rec.push(b); continue; }
+        const sep = rec.indexOf(0x1f), script = String.fromCharCode(...rec.slice(0, sep)), raw = rec.slice(sep + 1); rec = [];
+        if (JOURNAL_SKIP.test(script)) continue;
+        const text = gameText(raw).replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+        if (!text || /^patience/i.test(text)) continue;
+        if (jOpen && jOpen.script === script && now - jOpen.t < 1500) { jOpen.text += " " + text; jOpen.t = now; continue; }
+        closeMsg();
+        jOpen = { at: now, t: now, script, text, where: lastLevel ? `${lastLevel.name.replace(/^Carte — /, "")}${journalCell()}` : "" };
+        journal.push(jOpen); if (journal.length > 2000) journal.shift();
+      }
+      clearTimeout(jSaveT); jSaveT = setTimeout(() => { try { sessionStorage.setItem("ishar3-journal", JSON.stringify(journal)); } catch {} if (jmodalEl.classList.contains("open")) renderJournal(); }, 300);
+    }
+    // A finished message identical to the previous one (same text redrawn) is dropped.
+    function closeMsg() {
+      if (!jOpen) return; jOpen = null;
+      const [a, b] = journal.slice(-2);
+      if (a && b && a.text === b.text && b.at - a.at < 10000) journal.pop();
+    }
+    function journalCell() { try { const m = readMap(vm()); return m ? ` ${m.row},${m.col}` : ""; } catch { return ""; } }
+    setInterval(journalTick, 100);
+    function renderJournal() {
+      const fmt = t => new Date(t).toLocaleTimeString("fr-FR");
+      document.getElementById("jlist").innerHTML = journal.length ? journal.slice().reverse().map(j =>
+        `<div class="e"><div class="w">${fmt(j.at)}${j.where ? " · " + esc(j.where) : ""}</div>${esc(j.text)}</div>`).join("")
+        : '<div class="dim">Aucun dialogue pour l\'instant.</div>';
+    }
+    document.getElementById("jclear").addEventListener("click", () => { journal.length = 0; jOpen = null; try { sessionStorage.removeItem("ishar3-journal"); } catch {} renderJournal(); });
+    document.getElementById("jcopy").addEventListener("click", async () => {
+      const text = journal.map(j => `[${new Date(j.at).toLocaleTimeString("fr-FR")}${j.where ? " · " + j.where : ""}] ${j.text}`).join("\n");
+      let ok = false; try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+      document.getElementById("jmsg").textContent = ok ? `${journal.length} messages copiés.` : "Copie refusée par le navigateur.";
+    });
+
     function readParty(v) {
       const { H, m, base } = v, A = m + base;
       const hdr = (off, size) => (H[A + off - 6] | H[A + off - 5] << 8) === size && H[A + off - 1] === 0x40;
