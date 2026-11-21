@@ -31,7 +31,7 @@
     #jlist { display: flex; flex-direction: column; gap: 8px; font: 13px/1.45 system-ui, sans-serif; color: #d8cbb0; min-height: 4em; }
     #jlist .e { border-left: 2px solid #3a3226; padding-left: 8px; } #jlist .e .w { font-size: 11px; color: #8f826c; }
     .odlg select { font: 12px system-ui; color: #d8cbb0; background: #1c1712; border: 1px solid #3a3226; border-radius: 4px; padding: 2px 4px; }
-    .odlg #sound span { white-space: nowrap; }
+    #sound span { white-space: nowrap; }
     #modal, #pmodal { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; }
     #modal.open, #pmodal.open { display: flex; }
     #modal .box, #pmodal .box { background: #14110d; border: 1px solid #3a3226; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; max-width: 96vw; max-height: 96vh; box-sizing: border-box; }
@@ -160,7 +160,7 @@
     <div id="legend"><span><i style="background:#d9c9a0"></i>passage</span><span><i style="background:#c27a3a"></i>spécial</span><span><i style="background:#5a4a38"></i>mur</span><span><i style="background:#e0402a"></i>équipe</span><span><i style="background:#3b7be0;border-radius:50%"></i>auberge</span><span><i style="background:#e03b3b;border-radius:50%"></i>boutique</span><span title="Ennemis en vue (pâles : dernière position connue)"><i style="background:#c13cff;border-radius:50%"></i>ennemi</span></div>
     <div class="info" id="walkMsg" style="display:none"></div>
     <button id="openMap" type="button">Agrandir la carte (Tab)</button>
-    <button id="openOpts" type="button">Options (carte, affichage, démarrage, son)</button>
+    <button id="openOpts" type="button">Options (carte, affichage, clavier, démarrage)</button>
     <button id="openJournal" type="button">Journal des dialogues</button>
     <button id="openParty" type="button">Équipe : fiches, sorts, objets, boutiques</button>
     <div id="shopBox" style="display:none">
@@ -186,6 +186,11 @@
     <h2>Partie</h2>
     <div class="info" id="loadRow" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">Charger :</div>
     <div class="info dim" id="bootMsg"></div>
+    <h2>Son</h2>
+    <div id="sound" class="info" style="display:grid;grid-template-columns:auto 1fr 3.5em;gap:4px 8px;align-items:center">
+      <label for="volMusic">Musique</label><input type="range" id="volMusic" min="0" max="200" step="5"><span id="volMusicV"></span>
+      <label for="volSfx">Effets</label><input type="range" id="volSfx" min="0" max="200" step="5"><span id="volSfxV"></span>
+    </div>
   </aside>
   <div id="omodal" class="odlg" role="dialog" aria-label="Options"><div class="box">
     <div class="bar"><h3>Options</h3><button id="closeOpts" type="button" class="x">Fermer (Échap)</button></div>
@@ -208,11 +213,6 @@
         <label for="bootSkip" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootSkip"> Passer l'intro (aller à l'écran titre)</label>
         <label for="bootNoManual" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootNoManual"> Désactiver le contrôle du manuel (portes : toute réponse acceptée)</label>
         <label for="bootPassersby" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootPassersby"> Passants dans la ville (comme la version disquette)</label>
-      </div>
-      <h2>Son</h2>
-      <div id="sound" class="info" style="display:grid;grid-template-columns:auto 1fr 3.5em;gap:4px 8px;align-items:center">
-        <label for="volMusic">Musique</label><input type="range" id="volMusic" min="0" max="200" step="5"><span id="volMusicV"></span>
-        <label for="volSfx">Effets</label><input type="range" id="volSfx" min="0" max="200" step="5"><span id="volSfxV"></span>
       </div>
   </div></div>
   <div id="jmodal" class="odlg" role="dialog" aria-label="Journal des dialogues"><div class="box" style="width:min(620px,94vw)">
