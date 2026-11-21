@@ -175,7 +175,7 @@
     </div>
     <h2>Combat</h2>
     <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="autoAtk"> Auto-attaque (touche R)</label>
-    <div class="info dim" id="autoAtkMsg">Attaque au corps à corps : F6 à F10 = personnages I à V.</div>
+    <div class="info dim" id="autoAtkMsg">Attaque : touches 1 à 5 (ou F6 à F10) = personnages I à V.</div>
     <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="autoHeal"> Auto-soin sous
       <select id="healAt" style="font:12px system-ui;color:#d8cbb0;background:#1c1712;border:1px solid #3a3226;border-radius:4px;padding:1px 3px">
         <option value="40">40 %</option><option value="60" selected>60 %</option><option value="80">80 %</option></select> de vitalité</label>
@@ -195,6 +195,8 @@
     <h2>Affichage</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showInv"> Inventaire sous la vue du jeu</label>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showFoes"> Points de vie des monstres en haut de la vue</label>
+    <h2>Clavier</h2>
+      <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="digitAtk"> Touches 1 à 5 = attaque des personnages I à V (sinon : déplacements du jeu)</label>
     <h2>Démarrage</h2>
       <div class="info dim">Pris en compte au prochain lancement du jeu (rechargez la page si une partie est en cours).</div>
       <div class="info" style="display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center">
@@ -1071,7 +1073,7 @@
       autoAtkEl.checked = on;
       const names = lastParty.filter(c => meleeSlots().includes(c.slot)).map(c => c.name);
       autoAtkMsg.textContent = on ? (lastFoe ? "Combat contre " + lastFoe + " : " : "Active, en attente d'un ennemi : ") + (names.length ? names.join(", ") : "personne d'armé au corps à corps") + ". R pour arrêter."
-                                  : "Attaque au corps à corps : F6 à F10 = personnages I à V.";
+                                  : "Attaque : touches 1 à 5 (ou F6 à F10) = personnages I à V.";
     }
     autoAtkEl.addEventListener("change", () => { setAutoAttack(autoAtkEl.checked); Module.canvas.focus(); });
 
@@ -1146,6 +1148,20 @@
       }
       autoHealMsg.textContent = `Personne n'a soigné ${t.name} : refus, ou déjà soigné depuis son dernier coup (il faut être refrappé).`;
     });
+
+    // --- Attack keys: the digit row 1–5 presses F6–F10 (attack icon of characters I–V). The game uses
+    // those digits to move (1/3 strafe, 2 back, 4 turn, 5 forward), which arrows, ZQSD and A/E already do.
+    // Only real presses in exploration: menus and text input still get the digits (A/E send synthetic ones).
+    const digitAtkEl = document.getElementById("digitAtk");
+    try { digitAtkEl.checked = localStorage.getItem("ishar3-digitatk") !== "0"; } catch { digitAtkEl.checked = true; }
+    digitAtkEl.addEventListener("change", () => { try { localStorage.setItem("ishar3-digitatk", digitAtkEl.checked ? "1" : "0"); } catch {} });
+    for (const type of ["keydown", "keypress", "keyup"]) window.addEventListener(type, e => {
+      const m = /^Digit([1-5])$/.exec(e.code);
+      if (!m || !digitAtkEl.checked || !e.isTrusted || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (!lastLevel || !Module._em_player_control || !Module._em_player_control()) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      if (type === "keydown" && !e.repeat) { const k = FKEY(+m[1] - 1); keyEvent(k, "keydown"); setTimeout(() => keyEvent(k, "keyup"), 100); }
+    }, true);
 
     // --- Strafe: A (left) and E (right) send the game's 1 and 3 keys (digit row:
     // 1 strafe left, 3 strafe right; 4/6 turn, 5 forward, 2 back). The key is
