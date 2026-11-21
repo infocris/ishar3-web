@@ -204,6 +204,8 @@
     <h2>Affichage</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showInv"> Inventaire sous la vue du jeu</label>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showFoes"> Points de vie des monstres en haut de la vue</label>
+    <h2>Guide</h2>
+      <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="limitKnown"> Limiter auberges, boutiques, objets et sorts à ce que l'équipe connaît (sans spoiler)</label>
     <h2>Clavier</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="digitAtk"> Touches 1 à 5 = attaque des personnages I à V (sinon : déplacements du jeu)</label>
     <h2>Démarrage</h2>
@@ -1778,30 +1780,52 @@
     };
     const LEVEL_NOTE = { Magicien: { 16: "16–17" }, Clerc: { 20: "20–21" } };
     const learnedBy = n => Object.entries(SPELL_LEVELS).flatMap(([cl, t]) => t.filter(([, l]) => l.includes(+n)).map(([lv]) => `${cl} ${LEVEL_NOTE[cl]?.[lv] || lv}`)).join(" · ");
+    // --- "Known only" guide (option): inns and shops discovered by the party (the game's own place
+    // table, MAIN+0x3f94, per save), items once held and spells once known (gathered from the party
+    // as it is read, kept in localStorage), items sold in known shops.
+    const limitEl = document.getElementById("limitKnown");
+    try { limitEl.checked = localStorage.getItem("ishar3-limit") === "1"; } catch {}
+    const knownStore = (() => { try { const k = JSON.parse(localStorage.getItem("ishar3-known") || "{}"); return { places: k.places || [], items: k.items || [], spells: k.spells || [] }; } catch { return { places: [], items: [], spells: [] }; } })();
+    let knownPlaces = new Set(knownStore.places), knownItems = new Set(knownStore.items), knownSpells = new Set(knownStore.spells);
+    function updateKnown(v, party) {
+      let changed = false;
+      const pl = v ? readPlaces(v).map(p => p.row + "," + p.col) : [];
+      if (pl.length && pl.sort().join(";") !== [...knownPlaces].sort().join(";")) { knownPlaces = new Set(pl); changed = true; }
+      for (const c of party) {
+        for (const id of c.items) if (id && !knownItems.has(id)) { knownItems.add(id); changed = true; }
+        for (const n of c.spells) if (!knownSpells.has(n)) { knownSpells.add(n); changed = true; }
+      }
+      if (changed) try { localStorage.setItem("ishar3-known", JSON.stringify({ places: [...knownPlaces], items: [...knownItems], spells: [...knownSpells] })); } catch {}
+    }
+    const placeOk = at => !limitEl.checked || knownPlaces.has(String(at));
+    limitEl.addEventListener("change", () => { try { localStorage.setItem("ishar3-limit", limitEl.checked ? "1" : "0"); } catch {} refPanes(); renderInns(); });
     function refPanes() {
+      const lim = limitEl.checked, shops = SHOPS.filter(sh => placeOk(sh.at));
+      const spellOk = n => !lim || knownSpells.has(+n);
+      const nSpells = Object.keys(SPELLS).filter(spellOk).length;
       const who = n => lastParty.filter(c => c.spells.includes(+n)).map(c => c.name).join(", ");
-      document.getElementById("pspells").innerHTML = `<p>Les ${Object.keys(SPELLS).length} sorts du jeu. Un sort s'apprend tout seul en atteignant un niveau, selon la classe ; il coûte du psychique et gagne en puissance avec le niveau du lanceur. Colonne « Appris par » : classe et niveau ; « Équipe » : qui le connaît.</p>` +
+      document.getElementById("pspells").innerHTML = `<p>${lim ? `Sorts connus de l'équipe (${nSpells}) : la liste s'agrandit au fil des niveaux.` : `Les ${nSpells} sorts du jeu.`} Un sort s'apprend tout seul en atteignant un niveau, selon la classe ; il coûte du psychique et gagne en puissance avec le niveau du lanceur. Colonne « Appris par » : classe et niveau ; « Équipe » : qui le connaît.</p>` +
         `<h4 class="grp">Sorts par classe et niveau</h4><p class="dim">Relevé dans le jeu jusqu'au niveau 35. Guerrier, Barbare, Ranger, Voleur, Assassin… : aucun sort. Paladin et Prêtre : Soin et Protection physique dès le niveau 1, rien ensuite. Clé magique (18) ne s'apprend par aucune classe.</p>` +
-        ["Magicien", "Clerc"].map(cl => `<table style="margin-bottom:8px"><tr><th style="width:110px">${cl}</th><th>Nouveaux sorts</th><th>Équipe</th></tr>` +
-          SPELL_LEVELS[cl].map(([lv, l]) => `<tr><td class="n">niveau ${LEVEL_NOTE[cl]?.[lv] || lv}</td><td>${l.map(spellTag).join(" ")}</td><td>${esc(lastParty.filter(c => c.cls === cl && c.level >= lv).map(c => c.name).join(", "))}</td></tr>`).join("") + "</table>").join("") +
-        Object.entries(SCHOOLS).map(([k, label]) => `<h4 class="grp">${label}</h4><table><tr><th>n°</th><th></th><th>Sort</th><th>Effet</th><th>Appris par</th><th>Équipe</th></tr>` +
-          Object.entries(SPELLS).filter(([, sp]) => sp[1] === k).map(([n, sp]) => `<tr><td class="n dim">${n}</td><td style="width:34px">${spellIcon(n, 32)}</td><td><span class="sch-${k}" style="border:0;background:none">${esc(sp[0])}</span></td><td>${esc(sp[2])}</td><td class="dim" style="white-space:nowrap">${esc(learnedBy(n) || "—")}</td><td>${esc(who(n))}</td></tr>`).join("") + "</table>").join("") +
+        ["Magicien", "Clerc"].filter(cl => !lim || lastParty.some(c => c.cls === cl)).map(cl => `<table style="margin-bottom:8px"><tr><th style="width:110px">${cl}</th><th>Nouveaux sorts</th><th>Équipe</th></tr>` +
+          SPELL_LEVELS[cl].filter(([lv]) => !lim || lastParty.some(c => c.cls === cl && c.level >= lv)).map(([lv, l]) => `<tr><td class="n">niveau ${LEVEL_NOTE[cl]?.[lv] || lv}</td><td>${l.map(spellTag).join(" ")}</td><td>${esc(lastParty.filter(c => c.cls === cl && c.level >= lv).map(c => c.name).join(", "))}</td></tr>`).join("") + "</table>").join("") +
+        Object.entries(SCHOOLS).filter(([k]) => Object.entries(SPELLS).some(([n, sp]) => sp[1] === k && spellOk(n))).map(([k, label]) => `<h4 class="grp">${label}</h4><table><tr><th>n°</th><th></th><th>Sort</th><th>Effet</th><th>Appris par</th><th>Équipe</th></tr>` +
+          Object.entries(SPELLS).filter(([n, sp]) => sp[1] === k && spellOk(n)).map(([n, sp]) => `<tr><td class="n dim">${n}</td><td style="width:34px">${spellIcon(n, 32)}</td><td><span class="sch-${k}" style="border:0;background:none">${esc(sp[0])}</span></td><td>${esc(sp[2])}</td><td class="dim" style="white-space:nowrap">${esc(learnedBy(n) || "—")}</td><td>${esc(who(n))}</td></tr>`).join("") + "</table>").join("") +
         `<h4 class="grp">Potions (fiole magique)</h4><table><tr><th>Potion</th><th>Effet</th><th>Ingrédients</th></tr>` +
         RECIPES.map(r => `<tr><td>${r[0]}</td><td>${esc(r[1])}</td><td>${esc(r[2].join(", "))}</td></tr>`).join("") + "</table>";
       const sold = {};                                      // item no. → [{ price, shop }]
-      for (const sh of SHOPS) for (const [id, pr] of sh.stock) (sold[id] ||= []).push({ pr, sh });
+      for (const sh of shops) for (const [id, pr] of sh.stock) (sold[id] ||= []).push({ pr, sh });
       const owned = {};
       for (const c of lastParty) c.items.forEach(id => { if (id) (owned[id] ||= new Set()).add(c.name); });
       const minPr = id => sold[id] ? Math.min(...sold[id].map(x => x.pr)) : null;
-      const ids = Object.keys(ITEMS).map(Number).sort((a, b) => a - b);
+      const ids = Object.keys(ITEMS).map(Number).filter(id => !lim || knownItems.has(id) || sold[id]).sort((a, b) => a - b);
       const cmp = rowCompare(id => ITEMS[id], minPr);
       if (cmp) ids.sort(cmp);
-      document.getElementById("pitems").innerHTML = `<p>Tous les objets connus du jeu. Le chiffre (+N) du nom est le bonus de l'objet : aux coups pour une arme, en protection pour un casque, une armure ou un bouclier. « Où l'acheter » : boutiques de la ville, prix le plus bas d'abord.</p>
+      document.getElementById("pitems").innerHTML = `<p>${lim ? `Objets déjà eus par l'équipe ou vendus dans les boutiques découvertes (${ids.length}).` : "Tous les objets connus du jeu."} Le chiffre (+N) du nom est le bonus de l'objet : aux coups pour une arme, en protection pour un casque, une armure ou un bouclier. « Où l'acheter » : boutiques de la ville, prix le plus bas d'abord.</p>
         <table><tr><th>Objet</th><th>Type</th><th>Effet</th><th>Où l'acheter</th><th>Équipe</th></tr>` +
         ids.map(id => { const inf = itemInfo(id), s2 = (sold[id] || []).sort((a, b) => a.pr - b.pr);
           return `<tr data-q="${esc(norm(ITEMS[id]))}" data-kind="${esc(inf.kind)}"><td>${esc(ITEMS[id])}</td><td class="dim">${esc(inf.kind)}</td><td>${esc(inf.eff)}</td><td>${s2.map(x => `${price(x.pr)} <span class="dim">(${esc(shopName(x.sh))}, ${x.sh.at[0]},${x.sh.at[1]})</span>`).join("<br>")}</td><td>${esc([...(owned[id] || [])].join(", "))}</td></tr>`; }).join("") + "</table>";
-      document.getElementById("pshops").innerHTML = `<p>${SHOPS.length} boutiques en ville, ouvertes de 6 h à 21 h. Position : ligne, colonne de la case devant la porte (comme dans le panneau de carte). Prix en pièces d'or. Pour vendre, donnez l'objet au marchand : il propose son prix.</p><div class="shops">` +
-        (sortEl.value === "near" ? [...SHOPS].sort((a, b) => byDist(a.at, b.at)) : SHOPS).map(sh => `<div class="shop"><h4>${esc(shopName(sh))} <button type="button" class="goto" data-at="${sh.at}" style="float:right;font:11px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:2px 7px;cursor:pointer">Y aller</button></h4><div class="sub">ligne ${sh.at[0]}, colonne ${sh.at[1]}${sh.known === false ? " · pas encore découverte" : ""}${distText(sh.at)}</div><table>` +
+      document.getElementById("pshops").innerHTML = `<p>${lim ? `${shops.length} boutique${shops.length > 1 ? "s" : ""} découverte${shops.length > 1 ? "s" : ""} sur ${SHOPS.length}` : `${SHOPS.length} boutiques`} en ville, ouvertes de 6 h à 21 h. Position : ligne, colonne de la case devant la porte (comme dans le panneau de carte). Prix en pièces d'or. Pour vendre, donnez l'objet au marchand : il propose son prix.</p><div class="shops">` +
+        (sortEl.value === "near" ? [...shops].sort((a, b) => byDist(a.at, b.at)) : shops).map(sh => `<div class="shop"><h4>${esc(shopName(sh))} <button type="button" class="goto" data-at="${sh.at}" style="float:right;font:11px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:2px 7px;cursor:pointer">Y aller</button></h4><div class="sub">ligne ${sh.at[0]}, colonne ${sh.at[1]}${sh.known === false ? " · pas encore découverte" : ""}${distText(sh.at)}</div><table>` +
           sortStock(sh.stock).map(([id, pr, q]) => { const inf = itemInfo(id); return `<tr data-q="${esc(norm(itemName(id)))}" data-kind="${esc(inf.kind)}"><td title="${esc(inf.kind + " — " + inf.eff)}">${esc(itemName(id))}${q > 1 ? ` <span class="dim">×${q}</span>` : ""}<br><span class="dim" style="font-size:11px">${esc(inf.eff || inf.kind)}</span></td><td class="n">${price(pr)}</td></tr>`; }).join("") + "</table></div>").join("") + "</div>";
       applyFilter();
     }
@@ -1836,13 +1860,13 @@
       let inns = Object.entries(INNS).map(([at, inn]) => {
         let rec = inn.recruits.filter(keep); if (stat !== null) rec = [...rec].sort((a, b) => sgn * (b[stat] - a[stat]));
         return { at, inn, rec, name: PLACE_NAMES[at] || "Auberge" };
-      }).filter(x => !filtering || x.rec.length);
+      }).filter(x => placeOk(x.at) && (!filtering || x.rec.length));
       if (stat !== null) inns.sort((a, b) => sgn * ((b.rec[0]?.[stat] ?? -99 * sgn) - (a.rec[0]?.[stat] ?? -99 * sgn)));
       else if (o === "room") inns.sort((a, b) => a.inn.room - b.inn.room);
       else if (o === "near") inns.sort((a, b) => byDist(a.at, b.at));
       const n = inns.reduce((t, x) => t + x.rec.length, 0);
       const head = ["Niveau", "Force", "Constitution", "Agilité", "Intelligence"];
-      document.getElementById("pinns").innerHTML = `<p>${Object.keys(INNS).length} auberges en ville. Recrues relevées avec « Enrôler » (sauvegarde a3, équipe de 4) ; ${filtering ? `${n} recrue${n > 1 ? "s" : ""} correspond${n > 1 ? "ent" : ""} au filtre.` : `${allRecruits.length} recrues en tout.`} Position : case devant la porte. Prix en pièces d'or.</p><div class="shops">` +
+      document.getElementById("pinns").innerHTML = `<p>${limitEl.checked ? `${Object.keys(INNS).filter(placeOk).length} auberge(s) découverte(s) sur ${Object.keys(INNS).length}` : `${Object.keys(INNS).length} auberges`} en ville. Recrues relevées avec « Enrôler » (sauvegarde a3, équipe de 4) ; ${filtering ? `${n} recrue${n > 1 ? "s" : ""} correspond${n > 1 ? "ent" : ""} au filtre.` : `${limitEl.checked ? n : allRecruits.length} recrues en tout.`} Position : case devant la porte. Prix en pièces d'or.</p><div class="shops">` +
         (inns.length ? inns.map(({ at, inn, rec, name }) => `<div class="shop"><h4>${esc(name)} <button type="button" class="goto" data-at="${at}" style="float:right;font:11px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:2px 7px;cursor:pointer">Y aller</button></h4>
           <div class="sub">ligne ${at.replace(",", ", colonne ")} · chambre ${price(inn.room)} · repas ${price(inn.meal)}${distText(at)}</div>` +
           (rec.length ? "<table>" + rec.map(r => `<tr><td>${esc(r[0])}${inParty.has(norm(r[0])) ? ' <span class="dim">(dans l\'équipe)</span>' : ""}<br><span class="dim" style="font-size:11px">${esc(r[1])} · ${esc(r[2])}</span><br><span style="font-size:11px">${alignTag(r[8])}</span></td>
@@ -1870,7 +1894,7 @@
         cardsEl.innerHTML = '<div class="info">Pas d\'équipe pour l\'instant.</div>'; return;
       }
       try { localStorage.setItem("ishar3-party", JSON.stringify({ at: Date.now(), party })); } catch {}
-      lastParty = party; refPanes(); renderInns();
+      updateKnown(v, party); lastParty = party; refPanes(); renderInns();
       cardsEl.innerHTML = party.map(c => card(c, true)).join("");
       renderBars(party);
     }
