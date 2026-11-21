@@ -1,5 +1,23 @@
+diff --git a/build-wasm.sh b/build-wasm.sh
+new file mode 100755
+index 0000000..3e9d24e
+--- /dev/null
++++ b/build-wasm.sh
+@@ -0,0 +1,12 @@
++#!/bin/zsh
++set -e
++OUT=${1:-build-wasm}; mkdir -p $OUT/obj
++SRCS=(${(f)"$(find src -name '*.c' | grep -v -e sys_sdl1.c -e sys_atari)"})
++INC=(${(f)"$(find src -type d | sed 's/^/-I/')"})
++FLAGS=(-O2 -pthread -sUSE_SDL=2 -DNDEBUG -w)
++for f in $SRCS; do o=$OUT/obj/${${f//\//_}%.c}.o; [[ $o -nt $f ]] || echo "emcc -c $f -o $o $INC $FLAGS"; done | xargs -P 8 -I{} sh -c '{}'
++emcc $OUT/obj/*.o -o $OUT/alis.js $FLAGS \
++  -sPTHREAD_POOL_SIZE=6 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=128MB -sSTACK_SIZE=1MB \
++  -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sFORCE_FILESYSTEM=1 -lidbfs.js \
++  -sEXPORTED_RUNTIME_METHODS=callMain,FS,IDBFS,HEAPU8,HEAPU32,UTF8ToString -sEXPORTED_FUNCTIONS=_main,_malloc,_free -sENVIRONMENT=web,worker
++ls -la $OUT/alis.*
 diff --git a/src/alis.c b/src/alis.c
-index b8719c7..1af4af2 100644
+index b8719c7..92fab07 100644
 --- a/src/alis.c
 +++ b/src/alis.c
 @@ -24,6 +24,7 @@
@@ -10,7 +28,7 @@ index b8719c7..1af4af2 100644
  #include "audio.h"
  #include "image.h"
  #include "mem.h"
-@@ -1379,6 +1380,10 @@ void alis_loop(void)
+@@ -1379,6 +1380,12 @@ void alis_loop(void)
  #ifndef NDEBUG
          u32 pc_before = alis.script->pc;
  #endif
@@ -18,6 +36,8 @@ index b8719c7..1af4af2 100644
 +            boot_load_hook();
 +        if (opt_no_manual_check)
 +            manual_check_hook();
++        if (first_aid_pending())
++            first_aid_hook();
          readexec_opcode();
  #ifndef NDEBUG
          if (alis.script->running && alis.state && (alis.script->pc < alis.script->pc_org || alis.script->pc >= alis.script->pc_org + alis.script->data->sz))
@@ -255,7 +275,7 @@ index d3b0040..3ae176e 100644
  }
  
 diff --git a/src/patches.c b/src/patches.c
-index 232f5f2..8570203 100644
+index 232f5f2..0766225 100644
 --- a/src/patches.c
 +++ b/src/patches.c
 @@ -22,6 +22,9 @@
@@ -528,11 +548,86 @@ index 232f5f2..8570203 100644
      enum { kFixes = sizeof(script_fixes) / sizeof(script_fixes[0]) };
      s32 at[kFixes];
      for (u32 f = 0; f < kFixes; f++)
+@@ -175,3 +429,74 @@ void script_fix(const char *name, u8 *data, u32 data_sz)
+         }
+     }
+ }
++
++
++// First aid without the UI (Ishar 3). frise.IO handles the "Premiers soins" icon of the Act. menu:
++// after the wounded portrait is picked, its routine reads the healer from dir 0x57 and the wounded
++// member from dir 0x59 (party slots 0-4), then applies the game rules: refusal when sympathy
++// main.tc[0x3522][healer][wounded] < 5, once per hit (main.tc[0x35c6][w][w]), success when
++// rnd(100) < skill main.tc[0x3630][healer], heal = max vitality / 10, sympathy changes.
++// em_first_aid(h, w) queues a call to that routine; it runs when frise.IO is back in its idle
++// main loop (where it checks for a click on the panel), as a subroutine returning there.
++static volatile s32 aid_h = -1, aid_w = -1;
++static const u8 aid_sig[] = { 0x4b, 0x00, 0x0d, 0x4b, 0x00, 0x07, 0x07, 0xff, 0xff, 0x00,
++                              0x1f, 0x38, 0x12, 0x59, 0x4c, 0x00, 0xff, 0x3a, 0x14, 0xff, 0xff, 0x00,
++                              0x1f, 0x38, 0x12, 0x59, 0x28, 0xe0, 0x16 };   // 0xff = any byte
++static const u8 idle_sig[] = { 0x1f, 0x38, 0x1e, 0x56, 0x02, 0x4a, 0x00, 0x01, 0x40, 0x20, 0x8e, 0x16,
++                               0x4c, 0x00, 0xfa, 0x42, 0x36, 0x3a, 0x14 };   // main loop: "left click on the panel?"
++static s32 sig_find(const u8 *data, u32 sz, const u8 *sig, u32 len)
++{
++    for (u32 i = 0; i + len <= sz; i++)
++    {
++        u32 k = 0;
++        while (k < len && (sig[k] == 0xff || data[i + k] == sig[k]))
++            k++;
++        if (k == len)
++            return (s32)i;
++    }
++    return -1;
++}
++void first_aid_hook(void)
++{
++    static u32 org, sz;
++    static s32 entry = -1, idle = -1;
++    if (strncasecmp(alis.script->name, "frise", 5))
++        return;
++    sAlisScriptData *d = alis.script->data;
++    if (org != alis.script->pc_org || sz != d->sz)
++    {
++        org = alis.script->pc_org;
++        sz = d->sz;
++        entry = sig_find(alis.mem + org, sz, aid_sig, sizeof(aid_sig));
++        idle = sig_find(alis.mem + org, sz, idle_sig, sizeof(idle_sig));
++        if (entry >= 0)
++            entry += 10;                                // skip the menu erase and the portrait pick
++        ALIS_DEBUG(EDebugInfo, "\n### first aid routine 0x%x, idle loop 0x%x\n", entry, idle);
++    }
++    if (entry < 0 || idle < 0)
++    {
++        aid_h = aid_w = -1;                             // not this release: drop the request
++        return;
++    }
++    if (alis.script->pc - org != (u32)idle)
++        return;
++    xwrite8(alis.script->vram_org + 0x57, (u8)aid_h);
++    xwrite8(alis.script->vram_org + 0x59, (u8)aid_w);
++    xpush32(idle);                                      // cret comes back to the idle loop
++    alis.script->pc = org + entry;
++    aid_h = aid_w = -1;
++}
++s32 first_aid_pending(void) { return aid_w >= 0; }
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++// Queue a first aid by party slot (0-4); returns 0 when one is already waiting.
++EMSCRIPTEN_KEEPALIVE int em_first_aid(int h, int w)
++{
++    if (aid_w >= 0 || h < 0 || h > 4 || w < 0 || w > 4 || h == w)
++        return 0;
++    aid_h = h;
++    aid_w = w;
++    return 1;
++}
++EMSCRIPTEN_KEEPALIVE int em_first_aid_pending(void) { return aid_w >= 0; }
++#endif
 diff --git a/src/patches.h b/src/patches.h
-index 3b9d3b6..62de96b 100644
+index 3b9d3b6..f6bc24a 100644
 --- a/src/patches.h
 +++ b/src/patches.h
-@@ -25,3 +25,11 @@
+@@ -25,3 +25,13 @@
  #include "config.h"
  
  void script_fix(const char *name, u8 *data, u32 data_sz);
@@ -544,6 +639,8 @@ index 3b9d3b6..62de96b 100644
 +extern char opt_load[16];      // Ishar 3: --load=a3 loads that save from the title screen
 +extern s32 boot_load_state;    // 1 = waiting for the title menu, 2 = waiting for the slot menu
 +void boot_load_hook(void);     // Ishar 3: --skip-intro goes straight to the title screen           // Ishar 3: --lang=fr|en|de|es skips the flag screen
++s32 first_aid_pending(void);     // Ishar 3: em_first_aid() request waiting for frise.IO
++void first_aid_hook(void);       // runs before each instruction while a request waits
 diff --git a/src/sys/sys.c b/src/sys/sys.c
 index 89651c2..d4f11dc 100644
 --- a/src/sys/sys.c

@@ -1107,76 +1107,64 @@
     }
     autoAtkEl.addEventListener("change", () => { setAutoAttack(autoAtkEl.checked); Module.canvas.focus(); });
 
-    // --- Auto-heal with "Premiers soins" (Act. menu): when a living member drops below the threshold, the member
-    // best at first aid who agrees heals them. Game clicks (canvas fractions, measured in the game):
-    //   healer's Act. icon (0.022 + 0.2·member, 0.663) → menu of 4 icons [Enrol, Dismiss, Assassinate, First aid]
-    //   placed from column max(0, member − 1): red cross at (0.2·max(0, member − 1) + 0.35, 0.75)
-    //   → wounded member's portrait (0.097 + 0.2·member, 0.8265).
-    // Game rules (manual): a wounded member can get first aid only once until hit again;
-    // a healer may refuse ("Je refuse de soigner X") depending on alignments and racial sympathies.
+    // --- Auto-heal with "Premiers soins": when a living member drops below the threshold, the member
+    // best at first aid who agrees heals them. The engine runs the game's own routine (frise.IO,
+    // em_first_aid(healer, wounded) by party slot), so no menu opens. Game rules, all in MAIN (5×5 tables):
+    //   sympathy  tc 0x3522[healer][wounded] < 5 → "Je refuse de soigner X";
+    //   tried     tc 0x35c6[wounded][healer] = 1 after a failed attempt, [w][w] = 1 once healed:
+    //             both are cleared when the wounded member is hit again;
+    //   success   rnd(100) < skill tc 0x3630[healer], heals max vitality / 10.
     const autoHealEl = document.getElementById("autoHeal"), healAtEl = document.getElementById("healAt"), autoHealMsg = document.getElementById("autoHealMsg");
     try { const st = JSON.parse(localStorage.getItem("ishar3-autoheal") || "{}"); autoHealEl.checked = !!st.on; if (st.at) healAtEl.value = st.at; } catch {}
     const saveHeal = () => { try { localStorage.setItem("ishar3-autoheal", JSON.stringify({ on: autoHealEl.checked, at: healAtEl.value })); } catch {} };
     autoHealEl.addEventListener("change", () => { saveHeal(); Module.canvas.focus(); });
     healAtEl.addEventListener("change", () => { saveHeal(); Module.canvas.focus(); });
     let casting = false, healPause = 0;
-    const aidedAt = new Map();          // wounded name → vitality right after their first aid (healable again if it drops below)
-    const refused = new Map();          // "healer>wounded" → time of the refusal (or failure), skipped for 10 min
+    const aidRules = v => { const A = v.m + v.base;
+      return { sympathy: (h, w) => v.H[A + 0x3522 + 5 * h + w] << 24 >> 24, tried: (w, h) => v.H[A + 0x35c6 + 5 * w + h] !== 0 }; };
+    // Members able to give first aid to t now: alive, skilled, willing, and not yet tried on this wound.
+    function aidHelpers(v, party, t) {
+      const r = aidRules(v); if (r.tried(t.slot, t.slot)) return [];
+      return party.filter(c => c !== t && c.vit > 0 && c.aid > 0 && r.sympathy(c.slot, t.slot) >= 5 && !r.tried(t.slot, c.slot)).sort((a, b) => b.aid - a.aid);
+    }
     async function autoHealTick() {
       if (!autoHealEl.checked || casting || strafing || heldKeys.size || performance.now() < healPause) return;
       if (modalEl.classList.contains("open") || pmodalEl.classList.contains("open") || !lastLevel || !control()) return;
       const v = vm(), party = v && readParty(v); if (!party) return;
-      const at = +healAtEl.value / 100, now = performance.now();
-      for (const [k, t] of refused) if (now - t > 600000) refused.delete(k);
-      for (const c of party) if (aidedAt.has(c.name) && (c.vit < aidedAt.get(c.name) || c.vit >= c.vitMax * at)) aidedAt.delete(c.name);
-      const hurt = party.filter(c => c.vit > 0 && c.vit < c.vitMax * at && !aidedAt.has(c.name)).sort((a, b) => a.vit / a.vitMax - b.vit / b.vitMax);
+      const at = +healAtEl.value / 100;
+      const hurt = party.filter(c => c.vit > 0 && c.vit < c.vitMax * at).sort((a, b) => a.vit / a.vitMax - b.vit / b.vitMax);
       for (const t of hurt) {
-        const helper = party.filter(c => c !== t && c.vit > 0 && c.aid > 0 && !refused.has(c.name + ">" + t.name)).sort((a, b) => b.aid - a.aid)[0];
-        if (!helper) continue;
+        const helper = aidHelpers(v, party, t)[0]; if (!helper) continue;
         const after = await giveFirstAid(helper, t);
-        if (after && after.vit > t.vit) {
-          aidedAt.set(t.name, after.vit); healPause = performance.now() + 1500;
-          autoHealMsg.textContent = `${helper.name} soigne ${t.name} : ${t.vit} → ${after.vit} / ${after.vitMax}.`;
-        } else {
-          // refused, or already healed since the last hit: try another healer next round
-          refused.set(helper.name + ">" + t.name, performance.now()); healPause = performance.now() + 3000;   // the "Je refuse…" bubble covers the portraits
-          const left = party.filter(c => c !== t && c.vit > 0 && c.aid > 0 && !refused.has(c.name + ">" + t.name)).length;
-          if (!left) { aidedAt.set(t.name, t.vit); for (const c of party) refused.delete(c.name + ">" + t.name); }
-          autoHealMsg.textContent = `${helper.name} ne soigne pas ${t.name} (refus ou déjà soigné)` + (left ? ", essai avec un autre." : " ; on attend qu'il soit de nouveau frappé.");
-        }
+        autoHealMsg.textContent = aidResult(helper, t, after);
+        healPause = performance.now() + 1500;
         return;
       }
     }
     setInterval(autoHealTick, 1500);
-    // One first-aid gesture: healer's Act. → red cross → wounded portrait; returns the wounded member, re-read.
+    const aidResult = (h, t, after) => after && after.vit > t.vit ? `${h.name} soigne ${t.name} : ${t.vit} → ${after.vit} / ${after.vitMax}.` : `${h.name} n'arrive pas à soigner ${t.name}.`;
+    // One first aid through the engine; returns the wounded member, re-read.
     async function giveFirstAid(helper, t) {
       casting = true;
       try {
-        await gameClick(0.022 + 0.2 * helper.slot, 0.663); await wait(300);
-        await gameClick(0.2 * Math.max(0, helper.slot - 1) + 0.35, 0.75); await wait(300);
-        await gameClick(0.097 + 0.2 * t.slot, 0.8265); await wait(1000);
+        if (!Module._em_first_aid(helper.slot, t.slot)) return null;
+        for (let i = 0; i < 40 && Module._em_first_aid_pending(); i++) await wait(50);
+        await wait(200);
       } finally { casting = false; }
       return (readParty(vm()) || []).find(c => c.name === t.name);
     }
-    // "✚ soins" button under a wounded member: try healers from most to least skilled until one agrees.
+    // "✚ soins" button under a wounded member: the most skilled willing member who has not tried yet.
     document.getElementById("pbars").addEventListener("click", async e => {
       const bt = e.target.closest("button[data-aid]"); if (!bt) return;
       e.stopPropagation();
       if (casting || !lastLevel) return;
       if (!control()) { autoHealMsg.textContent = "Premiers soins impossibles pour l'instant (menu, dialogue ou combat en cours ?)."; return; }
-      const party = readParty(vm()) || [], t = party.find(c => c.slot === +bt.dataset.aid); if (!t) return;
-      const helpers = party.filter(c => c !== t && c.vit > 0 && c.aid > 0).sort((a, b) => b.aid - a.aid);
-      if (!helpers.length) { autoHealMsg.textContent = `Personne ne sait donner les premiers soins à ${t.name}.`; return; }
+      const v = vm(), party = readParty(v) || [], t = party.find(c => c.slot === +bt.dataset.aid); if (!t) return;
+      if (aidRules(v).tried(t.slot, t.slot)) { autoHealMsg.textContent = `${t.name} a déjà reçu les premiers soins : il faut qu'il soit de nouveau frappé.`; return; }
+      const h = aidHelpers(v, party, t)[0];
+      if (!h) { autoHealMsg.textContent = party.some(c => c !== t && c.vit > 0 && c.aid > 0) ? `Personne ne peut plus soigner ${t.name} (refus ou déjà essayé) avant qu'il soit de nouveau frappé.` : `Personne ne sait donner les premiers soins à ${t.name}.`; return; }
       bt.disabled = true;
-      for (const h of helpers) {
-        if (h !== helpers[0]) await wait(2500);              // the "Je refuse…" bubble covers the portraits
-        const before = (readParty(vm()) || []).find(c => c.name === t.name) || t, after = await giveFirstAid(h, before);
-        if (after && after.vit > before.vit) {
-          aidedAt.set(t.name, after.vit);
-          autoHealMsg.textContent = `${h.name} soigne ${t.name} : ${before.vit} → ${after.vit} / ${after.vitMax}.`; return;
-        }
-      }
-      autoHealMsg.textContent = `Personne n'a soigné ${t.name} : refus, ou déjà soigné depuis son dernier coup (il faut être refrappé).`;
+      autoHealMsg.textContent = aidResult(h, t, await giveFirstAid(h, t));
     });
 
     // --- Attack keys: the digit row 1–5 presses F6–F10 (attack icon of characters I–V). The game uses
