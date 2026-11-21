@@ -154,6 +154,7 @@
         <option value="teleport">téléportation</option><option value="walk">marche automatique</option></select></label>
     <div class="info" id="walkMsg" style="display:none"></div>
     <button id="openMap" type="button">Agrandir la carte (Tab)</button>
+    <button id="resetExplored" type="button" title="Efface les cases découvertes de toutes les cartes (une copie .bak est gardée sur le serveur)">Réinitialiser l'exploration</button>
     <h2>Équipe</h2>
     <div id="partySum" class="info" title="Ouvrir les fiches"></div>
     <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showInv"> Inventaire sous la vue du jeu</label>
@@ -628,7 +629,10 @@
         const v = at(r, c); if (v === 0xff || v === 0) break;  // wall or off the map: the view stops
       }
     }
-    async function saveExplored() {
+    let savingExplored = Promise.resolve(), resettingExplored = false;
+    function saveExplored() { return savingExplored = savingExplored.then(writeExplored); }
+    async function writeExplored() {
+      if (resettingExplored) return;
       for (const [key, e] of explored) {
         if (!e.dirty || !e.ready) continue;
         e.dirty = false;
@@ -640,6 +644,20 @@
       }
     }
     setInterval(saveExplored, 5000);
+    // Forget the explored cells of every map: the saved files are overwritten with an empty map
+    // (serve.py keeps the previous version as .bak), then the maps reload from scratch.
+    document.getElementById("resetExplored").addEventListener("click", async ev => {
+      if (!confirm("Effacer l'exploration de toutes les cartes ?")) return;
+      const btn = ev.currentTarget; btn.disabled = true; resettingExplored = true;
+      try {
+        await savingExplored;
+        const names = new Set(Array.from(explored.keys(), k => k + ".json"));
+        try { for (const n of await (await fetch("/saves-list/carte")).json()) if (n.endsWith(".json")) names.add(n); } catch {}
+        explored.clear(); loading.clear();
+        await Promise.all([...names].map(n => fetch("/saves/carte/" + n, { method: "PUT",
+          body: JSON.stringify({ rows: 0, cols: 0, seen: "" }) }).catch(() => {})));
+      } finally { explored.clear(); loading.clear(); resettingExplored = false; btn.disabled = false; }
+    });
     document.addEventListener("visibilitychange", () => { if (document.hidden) saveExplored(); });
 
     // Full map on a canvas (cells of s px). grid: light grid lines for the big map.
@@ -1850,7 +1868,7 @@
       }
       levelEl.textContent = lastLevel ? "Carte — " + lastLevel.name : "Carte";
       whereEl.textContent = `ligne ${mp.row}, colonne ${mp.col} · ${(DIRS[mp.dir] || ["?"])[0]}` +
-        (explored.get(lastLevel.raw.replace(/\.io$/i, "").toLowerCase()) ? ` · exploré ${Math.round(100 * explored.get(lastLevel.raw.replace(/\.io$/i, "").toLowerCase()).seen.reduce((a, b) => a + b, 0) / mp.cells.reduce((a, v, i) => a + (cellAt(mp, i) !== 0), 0))} %` : "");
+        (explored.get(lastLevel.raw.replace(/\.io$/i, "").toLowerCase()) ? ` · exploré ${Math.round(100 * explored.get(lastLevel.raw.replace(/\.io$/i, "").toLowerCase()).seen.reduce((a, b, i) => a + (b && cellAt(mp, i) !== 0 ? 1 : 0), 0) / mp.cells.reduce((a, v, i) => a + (cellAt(mp, i) !== 0), 0))} %` : "");
       const key = lastLevel.raw.replace(/\.io$/i, "").toLowerCase();
       const ex = exploreState(key, mp.rows, mp.cols);
       if (ex.ready && Module._em_player_control()) reveal(ex, mp);   // not during cutscenes
