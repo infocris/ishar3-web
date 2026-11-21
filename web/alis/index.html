@@ -270,6 +270,10 @@
     // --- Game files + saves ---------------------------------------------------------
     const known = new Map();                 // path → known mtime (to detect writes)
     const mtimeOf = p => { try { return +Module.FS.stat(p).mtime; } catch { return null; } };
+    // The page's own file reads must not count as game opens: reading BACK.INF from the slot-screen
+    // handler re-triggered that handler, thousands of times (~10 s freeze on LOAD).
+    let pageFs = 0;
+    const pageRead = p => { pageFs++; try { return Module.FS.readFile(p); } finally { pageFs--; } };
 
     async function prepare() {
       const FS = Module.FS;
@@ -372,7 +376,7 @@
     // Slots: BACK.INF order (most recent first), at most 7 as on screen.
     function slotNames() {
       try {
-        const b = Module.FS.readFile(DATA + "BACK.INF"), out = [];
+        const b = pageRead(DATA + "BACK.INF"), out = [];
         for (let i = 0; i < Math.min(7, b.length / 14); i++) { let t = ""; for (let k = 0; k < 14 && b[i * 14 + k]; k++) t += String.fromCharCode(b[i * 14 + k]); if (t) out.push(t.replace(/\.sav$/i, "")); }
         return out;
       } catch { return []; }
@@ -475,7 +479,7 @@
       startEl.remove();
       Module.canvas.focus();
       const fsOpen = Module.FS.open;
-      Module.FS.open = function (path, ...rest) { try { onGameOpen(String(path)); } catch (e) { console.warn(e); } return fsOpen.call(this, path, ...rest); };
+      Module.FS.open = function (path, ...rest) { if (!pageFs) try { onGameOpen(String(path)); } catch (e) { console.warn(e); } return fsOpen.call(this, path, ...rest); };
       const args = ["--2x"];
       if (boot.lang) args.push("--lang=" + boot.lang);
       if (boot.skip || typeof load === "string") args.push("--skip-intro");
@@ -499,7 +503,7 @@
           if (name[0] === ".") continue;
           const p = DATA + name, m = mtimeOf(p);
           if (m === null || known.get(p) === m) continue;
-          const data = Module.FS.readFile(p);
+          const data = pageRead(p);
           const r = await fetch("/saves/" + SAVE_DIR + "/" + encodeURIComponent(name), { method: "PUT", body: data });
           if (r.ok) { known.set(p, m); saveTimes[name.toUpperCase()] = Date.now(); }
           if (name.toUpperCase() === "BACK.INF") drawLoadRow();   // new save: slot order
