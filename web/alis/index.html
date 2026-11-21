@@ -186,6 +186,7 @@
       <select id="bootLang"><option value="">demander (drapeaux)</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="en">English</option><option value="es">Español</option></select>
       <label for="bootSkip" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootSkip"> Passer l'intro (aller à l'écran titre)</label>
       <label for="bootNoManual" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootNoManual"> Désactiver le contrôle du manuel (portes : toute réponse acceptée)</label>
+      <label for="bootPassersby" style="grid-column:1/-1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="bootPassersby"> Passants dans la ville (comme la version disquette)</label>
     </div>
     <div class="info" id="loadRow" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">Charger :</div>
     <div class="info dim" id="bootMsg"></div>
@@ -282,16 +283,19 @@
     // At launch, the engine gets (see alis-src/src/patches.c):
     //   --lang=fr|en|de|es  no flags screen; --skip-intro  no logo or intro;
     //   --load=a3           loads this save from the title screen, without a click;
-    //   --no-manual-check   the gate mage accepts any word (typhus.IO patched on load).
+    //   --no-manual-check   the gate mage accepts any word (typhus.IO patched on load);
+    //   --passersby         town passersby as in the floppy release (two MAIN.IO tests patched on load).
     // With no remembered language, the player picks a flag: the page recognises it from the
     // text file opened (message.IO, messageU, messageD, messageS) and remembers it.
     // Once the game runs, "Charger" clicks inside the game (title screen or disk).
-    const boot = (() => { try { return { lang: "", skip: true, noManual: true, ...JSON.parse(localStorage.getItem("ishar3-boot") || "{}") }; } catch { return { lang: "", skip: true, noManual: true }; } })();
+    const boot = (() => { try { return { lang: "", skip: true, noManual: true, passersby: true, ...JSON.parse(localStorage.getItem("ishar3-boot") || "{}") }; } catch { return { lang: "", skip: true, noManual: true, passersby: true }; } })();
     const saveBoot = () => { try { localStorage.setItem("ishar3-boot", JSON.stringify(boot)); } catch {} };
     const bootLangEl = document.getElementById("bootLang"), bootSkipEl = document.getElementById("bootSkip"), bootMsgEl = document.getElementById("bootMsg");
     bootLangEl.value = boot.lang; bootSkipEl.checked = boot.skip;
     const bootNoManualEl = document.getElementById("bootNoManual"); bootNoManualEl.checked = boot.noManual;
     bootNoManualEl.addEventListener("change", () => { boot.noManual = bootNoManualEl.checked; saveBoot(); });
+    const bootPassersbyEl = document.getElementById("bootPassersby"); bootPassersbyEl.checked = boot.passersby;
+    bootPassersbyEl.addEventListener("change", () => { boot.passersby = bootPassersbyEl.checked; saveBoot(); });
     bootLangEl.addEventListener("change", () => { boot.lang = bootLangEl.value; saveBoot(); });
     bootSkipEl.addEventListener("change", () => { boot.skip = bootSkipEl.checked; saveBoot(); });
     const LANG_OF_MSG = { "message.io": "fr", "messaged.io": "de", "messageu.io": "en", "messages.io": "es" };
@@ -438,6 +442,7 @@
       const args = ["--2x"];
       if (boot.lang) args.push("--lang=" + boot.lang);
       if (boot.skip || typeof load === "string") args.push("--skip-intro");
+      if (boot.passersby) args.push("--passersby");
       if (boot.noManual) { args.push("--no-manual-check"); document.getElementById("manualOff").style.display = ""; }
       if (typeof load === "string") { args.push("--load=" + load); phase = "game"; }
       Module.callMain([...args, DATA]);
