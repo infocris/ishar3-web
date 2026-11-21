@@ -10,6 +10,11 @@ shop and inn panels, auto-attack and more. The game and the page UI are in Frenc
 `ISHAR3_GAME` environment variable to it. The title menu also needs the empty marker files
 `INTRO150.DAT` and `LOGO150.DAT` in that folder.
 
+## Videos
+
+- [Ishar 3 - Modern UI - Ep 1](https://www.youtube.com/watch?v=EgyPEqAMWcQ)
+- [Ishar 3 - Modern UI - Ep 2](https://www.youtube.com/watch?v=uNz_G1bw36A)
+
 ## Run
 
 ```sh
