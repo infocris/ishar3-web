@@ -194,6 +194,7 @@
       <button id="resetExplored" type="button" title="Efface les cases découvertes de toutes les cartes (une copie .bak est gardée sur le serveur)">Réinitialiser l'exploration</button>
     <h2>Affichage</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showInv"> Inventaire sous la vue du jeu</label>
+      <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showFoes"> Points de vie des monstres en haut de la vue</label>
     <h2>Démarrage</h2>
       <div class="info dim">Pris en compte au prochain lancement du jeu (rechargez la page si une partie est en cours).</div>
       <div class="info" style="display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center">
@@ -983,6 +984,9 @@
     // its current health is the word MAIN+0x20c8 + 2·no. (table of 110 characters). No stored maximum:
     // we keep the highest value seen during the encounter (full health if the monster arrives unhurt).
     const foesEl = document.getElementById("foes"), foeMax = new Map();
+    const showFoesEl = document.getElementById("showFoes");      // option: monster health bars over the view
+    try { showFoesEl.checked = localStorage.getItem("ishar3-showfoes") !== "0"; } catch { showFoesEl.checked = true; }
+    showFoesEl.addEventListener("change", () => { try { localStorage.setItem("ishar3-showfoes", showFoesEl.checked ? "1" : "0"); } catch {} if (!showFoesEl.checked) foesEl.style.display = "none"; });
     // Enemies spotted on the map: the game only keeps monsters in the facing direction,
     // so we keep their last seen position (character no. → cell) for FOE_KEEP ms.
     const foeSeen = new Map(), FOE_KEEP = 45000;
@@ -1036,8 +1040,9 @@
         foeKey = key;
         foesEl.innerHTML = list.map(f => `<div class="foe" title="${esc(f.name)}"><span>${esc(f.name)}</span><i><b style="width:${Math.max(0, Math.min(100, 100 * f.hp / (f.max || 1)))}%"></b></i><span>${Math.max(0, f.hp)} / ${f.max}</span></div>`).join("");
       }
-      foesEl.style.display = list.length ? "" : "none";
-      if (list.length) {                                   // at the top of the 3D view, centred
+      const show = list.length && showFoesEl.checked;
+      foesEl.style.display = show ? "" : "none";
+      if (show) {                                   // at the top of the 3D view, centred
         const r = Module.canvas.getBoundingClientRect();
         foesEl.style.left = (r.left + r.width * 0.39) + "px"; foesEl.style.top = (r.top + r.height * 0.075) + "px";
       }
