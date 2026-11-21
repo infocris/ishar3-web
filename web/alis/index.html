@@ -158,6 +158,9 @@
     <canvas id="local" width="276" height="276"></canvas>
     <canvas id="full" width="276" height="200"></canvas>
     <div id="legend"><span><i style="background:#d9c9a0"></i>passage</span><span><i style="background:#c27a3a"></i>spécial</span><span><i style="background:#5a4a38"></i>mur</span><span><i style="background:#e0402a"></i>équipe</span><span><i style="background:#3b7be0;border-radius:50%"></i>auberge</span><span><i style="background:#e03b3b;border-radius:50%"></i>boutique</span><span title="Ennemis en vue (pâles : dernière position connue)"><i style="background:#c13cff;border-radius:50%"></i>ennemi</span></div>
+    <label class="info" style="display:flex;gap:6px;align-items:center">Double-clic sur la carte :
+      <select id="travelModePanel" style="font:12px system-ui;color:#d8cbb0;background:#1c1712;border:1px solid #3a3226;border-radius:4px;padding:2px 4px">
+        <option value="teleport">téléportation</option><option value="walk">marche automatique</option></select></label>
     <div class="info" id="walkMsg" style="display:none"></div>
     <button id="openMap" type="button">Agrandir la carte (Tab)</button>
     <button id="openOpts" type="button">Options (carte, affichage, clavier, démarrage)</button>
@@ -1237,7 +1240,13 @@
     // stops it; so does a fight or a menu. A cell that refuses entry is marked blocked and the path recomputed.
     const travelModeEl = document.getElementById("travelMode"), walkMsgEl = document.getElementById("walkMsg");
     try { travelModeEl.value = localStorage.getItem("ishar3-travel") === "walk" ? "walk" : "teleport"; } catch {}
-    travelModeEl.addEventListener("change", () => { try { localStorage.setItem("ishar3-travel", travelModeEl.value); } catch {} Module.canvas.focus(); });
+    // Two selectors (side panel and big map) share the same setting.
+    const travelModePanelEl = document.getElementById("travelModePanel");
+    travelModePanelEl.value = travelModeEl.value;
+    for (const el of [travelModeEl, travelModePanelEl]) el.addEventListener("change", () => {
+      travelModeEl.value = travelModePanelEl.value = el.value;
+      try { localStorage.setItem("ishar3-travel", el.value); } catch {} Module.canvas.focus();
+    });
     const DIR_STEP = { 1: [0, -1], 2: [1, 0], "-1": [0, 1], "-2": [-1, 0] };        // game direction → [Δrow, Δcolumn]
     const CW = [1, 2, -1, -2];                                                       // N, E, S, W clockwise
     let walk = null;                                                                 // walk in progress: { stop }
@@ -1381,6 +1390,15 @@
       hoverEl.textContent = `Téléporté en ligne ${r}, colonne ${c}.`;
       return true;
     }
+    // Close-up minimap (top right): double-click a cell to go there too (cell i,j = row, column offset).
+    let localInfo = null;
+    localCv.addEventListener("dblclick", e => {
+      if (!localInfo) return;
+      const b = localCv.getBoundingClientRect(), k = localCv.width / b.width, { mp, L, half } = localInfo;
+      const r = mp.row - half + Math.floor((e.clientX - b.left) * k / L), c = mp.col - half + Math.floor((e.clientY - b.top) * k / L);
+      if (r >= 0 && r < mp.rows && c >= 0 && c < mp.cols) travelModeEl.value === "walk" ? walkTo(r, c) : teleport(r, c);
+    });
+    localCv.title = "Double-clic : aller à cette case";
     bigCv.addEventListener("dblclick", e => {
       if (!bigInfo) return;
       const b = bigCv.getBoundingClientRect(), k = bigCv.width / b.width;
@@ -1985,6 +2003,7 @@
       let ctx;
       // close-up view: 23×23 cells centred on the party
       const N = 23, L = Math.floor(localCv.width / N), half = (N - 1) / 2;
+      localInfo = { mp, L, half };
       ctx = localCv.getContext("2d"); ctx.clearRect(0, 0, localCv.width, localCv.height);
       for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
         const col = cellColor(at(mp.row - half + i, mp.col - half + j));
