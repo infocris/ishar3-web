@@ -196,9 +196,6 @@
     <div class="bar"><h3>Options</h3><button id="closeOpts" type="button" class="x">Fermer (Échap)</button></div>
     <h2>Carte</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="revealAll"> Tout révéler</label>
-      <label class="info" style="display:flex;gap:6px;align-items:center">Aller à une case :
-        <select id="travelMode" style="font:12px system-ui;color:#d8cbb0;background:#1c1712;border:1px solid #3a3226;border-radius:4px;padding:2px 4px">
-          <option value="teleport">téléportation</option><option value="walk">marche automatique</option></select></label>
       <button id="resetExplored" type="button" title="Efface les cases découvertes de toutes les cartes (une copie .bak est gardée sur le serveur)">Réinitialiser l'exploration</button>
     <h2>Affichage</h2>
       <label class="info" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="showInv"> Inventaire sous la vue du jeu</label>
@@ -235,7 +232,7 @@
   </div>
   <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="box">
-      <div class="bar"><h3 id="modalTitle">Carte</h3><span class="hint" id="hover"></span><button id="closeMap" type="button" style="font:12px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;cursor:pointer">Fermer (Échap)</button></div>
+      <div class="bar"><h3 id="modalTitle">Carte</h3><span class="hint" id="hover"></span><label style="display:flex;gap:6px;align-items:center;font:12px system-ui;color:#a99c86">Double-clic :<select id="travelMode" style="font:12px system-ui;color:#d8cbb0;background:#1c1712;border:1px solid #3a3226;border-radius:4px;padding:2px 4px"><option value="teleport">téléportation</option><option value="walk">marche automatique</option></select></label><button id="closeMap" type="button" style="font:12px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;cursor:pointer">Fermer (Échap)</button></div>
       <canvas id="bigmap" width="820" height="570"></canvas>
     </div>
   </div>
