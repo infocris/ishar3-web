@@ -94,8 +94,6 @@
     #pbars .buff.psy { background: #1e2a3e; color: #8fc0ff; border: 1px solid #3e6aa8; }
     #pbars .gold { font: 600 11px system-ui, sans-serif; color: #e8c070; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
     .align { white-space: nowrap; }
-    #partySum { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #d8cbb0; cursor: pointer; }
-    #partySum .m { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
     #pmodal .cards { min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; overflow: auto; }
     .card { background: #1c1712; border: 1px solid #3a3226; border-radius: 6px; padding: 10px 12px; font-size: 13px; color: #d8cbb0; display: flex; flex-direction: column; gap: 8px; }
     .xpbar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; color: #8f826c; }
@@ -161,11 +159,7 @@
     <div class="info" id="walkMsg" style="display:none"></div>
     <button id="openMap" type="button">Agrandir la carte (Tab)</button>
     <button id="openOpts" type="button">Options (carte, affichage, démarrage, son)</button>
-    <h2>Équipe</h2>
-    <div id="partySum" class="info" title="Ouvrir les fiches"></div>
-    <button id="openParty" type="button">Fiches, sorts, objets, boutiques</button>
-    <button id="exportParty" type="button" title="Copie le texte dans le presse-papiers">Copier l'équipe (noms, classes, armes, armures)</button>
-    <div class="info dim" id="exportMsg" style="display:none"></div>
+    <button id="openParty" type="button">Équipe : fiches, sorts, objets, boutiques</button>
     <div id="shopBox" style="display:none">
       <h2>Boutique</h2>
       <div class="info dim" style="margin:4px 0 6px">Un clic sur un nom achète l'objet pour ce personnage. Échap : sortir.</div>
@@ -220,7 +214,7 @@
   <div id="sellPop" role="dialog"></div>
   <div id="pmodal" role="dialog" aria-modal="true" aria-labelledby="pTitle">
     <div class="box" style="width:min(1200px,96vw)">
-      <div class="bar"><h3 id="pTitle">Équipe</h3><div class="tabs" id="ptabs"><button type="button" data-pane="cards" class="on">Équipe</button><button type="button" data-pane="pspells">Sorts</button><button type="button" data-pane="pitems">Objets</button><button type="button" data-pane="pshops">Boutiques</button><button type="button" data-pane="pinns">Auberges</button></div><input id="pfilter" type="search" placeholder="Filtrer par nom d'objet…" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;min-width:160px"><select id="ptype" title="Type d'objet" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Tous les types</option></select><select id="psort" title="Ordre" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Ordre du jeu</option><option value="name">Nom</option><option value="up">Prix croissant</option><option value="down">Prix décroissant</option><option value="near">Boutique la plus proche</option></select><select id="pclass" title="Classe" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Toutes les classes</option></select><select id="prace" title="Race" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Toutes les races</option></select><select id="rsort" title="Ordre" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Ordre de l'auberge</option><option value="3">Niveau</option><option value="4">Force</option><option value="5">Constitution</option><option value="6">Agilité</option><option value="7">Intelligence</option><option value="8">Les plus bons</option><option value="-8">Les plus mauvais</option><option value="room">Chambre la moins chère</option><option value="near">Auberge la plus proche</option></select><button id="closeParty" type="button" style="white-space:nowrap;font:12px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;cursor:pointer">Fermer (Échap)</button></div>
+      <div class="bar"><h3 id="pTitle">Équipe</h3><div class="tabs" id="ptabs"><button type="button" data-pane="cards" class="on">Équipe</button><button type="button" data-pane="pspells">Sorts</button><button type="button" data-pane="pitems">Objets</button><button type="button" data-pane="pshops">Boutiques</button><button type="button" data-pane="pinns">Auberges</button></div><input id="pfilter" type="search" placeholder="Filtrer par nom d'objet…" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;min-width:160px"><select id="ptype" title="Type d'objet" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Tous les types</option></select><select id="psort" title="Ordre" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Ordre du jeu</option><option value="name">Nom</option><option value="up">Prix croissant</option><option value="down">Prix décroissant</option><option value="near">Boutique la plus proche</option></select><select id="pclass" title="Classe" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Toutes les classes</option></select><select id="prace" title="Race" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Toutes les races</option></select><select id="rsort" title="Ordre" style="display:none;font:12px system-ui;color:#d8cbb0;background:#0f0c09;border:1px solid #3a3226;border-radius:4px;padding:5px 6px"><option value="">Ordre de l'auberge</option><option value="3">Niveau</option><option value="4">Force</option><option value="5">Constitution</option><option value="6">Agilité</option><option value="7">Intelligence</option><option value="8">Les plus bons</option><option value="-8">Les plus mauvais</option><option value="room">Chambre la moins chère</option><option value="near">Auberge la plus proche</option></select><span id="exportMsg" style="display:none;font:12px system-ui;color:#a99c86"></span><button id="exportParty" type="button" title="Copie les noms, classes, armes et armures dans le presse-papiers" style="white-space:nowrap;font:12px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;cursor:pointer">Copier l'équipe</button><button id="closeParty" type="button" style="white-space:nowrap;font:12px system-ui;color:#e8c070;background:#241e16;border:1px solid #3a3226;border-radius:4px;padding:5px 8px;cursor:pointer">Fermer (Échap)</button></div>
       <div class="pane cards on" id="cards"></div>
       <div class="pane ref" id="pspells"></div>
       <div class="pane ref" id="pitems"></div>
@@ -1516,8 +1510,8 @@
       }
       return out;
     }
-    const pmodalEl = document.getElementById("pmodal"), cardsEl = document.getElementById("cards"), partySumEl = document.getElementById("partySum");
-    const openParty = () => { pmodalEl.classList.add("open"); refreshDist(true); };
+    const pmodalEl = document.getElementById("pmodal"), cardsEl = document.getElementById("cards");
+    const openParty = () => { pmodalEl.classList.add("open"); refreshDist(true); document.getElementById("exportMsg").style.display = "none"; };
     // --- Walking distance to each shop and inn from the current position (in the city):
     // breadth-first search over walkable cells (like auto-walk), up to the cell
     // in front of the door or, if it cannot be reached on foot, another free cell next to the door.
@@ -1570,7 +1564,6 @@
     document.getElementById("openParty").addEventListener("click", openParty);
     document.getElementById("closeParty").addEventListener("click", closeParty);
     pmodalEl.addEventListener("click", e => { if (e.target === pmodalEl) closeParty(); });
-    partySumEl.addEventListener("click", openParty);
     const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     const rows = list => "<table>" + list.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("") + "</table>";
     // Inventory cell: game icon (×2) + short name; the floating tooltip gives the details.
@@ -1643,8 +1636,7 @@
         const ta = document.createElement("textarea"); ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
         document.body.appendChild(ta); ta.select(); try { copied = document.execCommand("copy"); } catch (e2) {} ta.remove();
       }
-      msg.textContent = copied ? "Équipe copiée : colle-la où tu veux (Cmd+V)." : "La copie a échoué : le navigateur l'a refusée.";
-      Module.canvas.focus();
+      msg.textContent = copied ? "Copiée (Cmd+V pour coller)." : "Copie refusée par le navigateur.";
     });
     let partyKey = null, partyTick = 0, lastParty = [];
     document.getElementById("ptabs").addEventListener("click", e => {
@@ -1763,16 +1755,13 @@
       if (!party || !party.length) {
         let old = null; try { old = JSON.parse(localStorage.getItem("ishar3-party") || "null"); } catch {}
         if (old && old.party.length) {                       // no game in progress: last party read
-          partySumEl.innerHTML = '<span class="dim">Dernière lecture : ' + esc(new Date(old.at).toLocaleString("fr-FR")) + "</span>";
           cardsEl.innerHTML = old.party.map(c => card(c, false)).join(""); return;
         }
         pbarsEl.innerHTML = ""; document.documentElement.style.setProperty("--strip", "64px");
-        partySumEl.textContent = "Pas d'équipe pour l'instant.";
         cardsEl.innerHTML = '<div class="info">Pas d\'équipe pour l\'instant.</div>'; return;
       }
       try { localStorage.setItem("ishar3-party", JSON.stringify({ at: Date.now(), party })); } catch {}
       lastParty = party; refPanes(); renderInns();
-      partySumEl.innerHTML = party.map(c => `<div class="m"><span>${esc(c.name)} <span style="color:#8f826c">${esc(c.cls)} niv. ${c.level}</span> ${alignTag(c.align)}</span><span>${c.vit} / ${c.vitMax}</span></div>`).join("");
       cardsEl.innerHTML = party.map(c => card(c, true)).join("");
       renderBars(party);
     }
