@@ -340,12 +340,9 @@
     bootLangEl.addEventListener("change", () => { boot.lang = bootLangEl.value; saveBoot(); });
     bootSkipEl.addEventListener("change", () => { boot.skip = bootSkipEl.checked; saveBoot(); });
     const LANG_OF_MSG = { "message.io": "fr", "messaged.io": "de", "messageu.io": "en", "messages.io": "es" };
-    // Slots screen: 2 rows of 4 (7 recent saves from BACK.INF + "Autre", which asks for a name).
-    const SLOT_X = [0.128, 0.378, 0.628, 0.878], SLOT_YS = [0.80, 0.872], SLOT_OTHER = 7;
-    const slotXY = i => [SLOT_X[i % 4], SLOT_YS[i >> 2]];
     const wait = ms => new Promise(r => setTimeout(r, ms));
     let phase = "boot";                                     // boot → flags → intro → title → game
-    let busy = false, pendingLoad = null;
+    let busy = false;
     async function gameClick(fx, fy, hover = 120) {
       const cv = Module.canvas, r = cv.getBoundingClientRect();
       const ev = (type, dx = 0) => cv.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window,
@@ -356,10 +353,6 @@
     const opened = [];                                       // last files opened by the game
     let lastLevelFile = null;                                // last location script opened (fville, fdj3…)
     const openedSince = (re, t) => opened.some(o => o.t >= t && re.test(o.f));
-    async function clickUntil(fx, fy, re, tries = 4, gap = 2500) {
-      for (let i = 0; i < tries; i++) { const t = performance.now(); await gameClick(fx, fy); await wait(gap); if (openedSince(re, t)) return true; }
-      return false;
-    }
     function onGameOpen(path) {
       const f = path.replace(/^.*\//, "").toLowerCase();
       opened.push({ f, t: performance.now() }); if (opened.length > 50) opened.shift();
@@ -370,7 +363,6 @@
         boot.lang = LANG_OF_MSG[f]; bootLangEl.value = boot.lang; saveBoot();   // player's first choice: remembered
       } else if (f === "accueil.io" && phase === "boot") {
         phase = "title";
-        if (pendingLoad !== null) { const s = pendingLoad; pendingLoad = null; setTimeout(() => loadName(s), 2500); }
       }
     }
     // Slots: BACK.INF order (most recent first), at most 7 as on screen.
@@ -435,42 +427,27 @@
       for (const t0 = performance.now(); performance.now() - t0 < ms; await wait(500)) if (lastLevel && (!was || performance.now() - t0 > 4000)) return true;
       return false;
     }
-    // Click the save's slot; outside the 7 recent ones: "Autre", then type its name.
-    async function pickSlot(name) {
-      const i = slotNames().findIndex(n => n.toLowerCase() === name.toLowerCase());
-      if (i >= 0) { await gameClick(...slotXY(i)); return; }
-      await gameClick(...slotXY(SLOT_OTHER)); await wait(1200); await typeWord(name.toLowerCase());
-    }
+    // Load any save through the engine (em_load): from the title screen, the slots screen or in
+    // game; the engine opens the game's own load code (io.IO) and gives it the file name.
     async function loadName(name) {
       if (busy) return;
       hideAllSaves();
-      const recent = slotNames().some(n => n.toLowerCase() === name.toLowerCase());
-      if (startEl.isConnected) {                             // the engine loads one of the recent saves itself; otherwise through the title screen
-        if (recent) { start(name); return; }
-        pendingLoad = name; start(); bootMsgEl.textContent = `Chargement de ${name} dès l'écran titre…`; return;
-      }
-      if (phase !== "title" && !lastLevel) {               // still starting: wait for the title screen
-        pendingLoad = name; bootMsgEl.textContent = `Chargement de ${name} dès l'écran titre…`; return;
-      }
+      if (startEl.isConnected) { start(name); return; }   // not started yet: --load at boot
       busy = true; bootMsgEl.textContent = `Chargement de ${name}…`;
       try {
-        let ok;
-        if (slotScreen) {                                    // the slots screen is already open
-          slotScreen = false; await pickSlot(name); ok = await inGame();
-        } else if (lastLevel) {                              // in game: DISK → LOAD → slot
-          await gameClick(0.832, 0.051); await wait(1500); await gameClick(0.752, 0.133); await wait(2500);
-          await pickSlot(name); ok = await inGame();
-        } else {                                             // title screen: load saves (opens MAST.FIC) → Ishar 3 → slot
-          ok = await clickUntil(0.571, 0.598, /^mast\.fic$/, 6);
-          for (let k = 0; ok && k < 3; k++) {
-            await gameClick(0.5, 0.595); await wait(2000);
-            await pickSlot(name);
-            if ((ok = await inGame())) break;
-          }
+        const p = Module._malloc(name.length + 1);
+        [...name, "\0"].forEach((c, i) => Module.HEAPU8[p + i] = c.charCodeAt(0) & 0x7f);
+        const queued = Module._em_load(p); Module._free(p);
+        let ok = false;
+        if (queued) {
+          // In game the request waits for the panel's main loop (closed menus); at the title, for its menu.
+          for (const t0 = performance.now(); Module._em_load_pending() && performance.now() - t0 < 20000; ) await wait(200);
+          if (Module._em_load_pending()) Module._em_load_cancel();
+          else ok = await inGame();
         }
         if (ok) phase = "game";
         Module.canvas.focus();
-        bootMsgEl.textContent = ok ? "" : `Échec du chargement automatique de ${name} : chargez-le depuis le jeu.`;
+        bootMsgEl.textContent = ok ? "" : `Échec du chargement de ${name} : fermez les menus ouverts, ou chargez-le depuis le jeu.`;
       } finally { busy = false; }
     }
 
