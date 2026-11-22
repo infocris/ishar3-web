@@ -188,7 +188,7 @@
         <option value="40">40 %</option><option value="60" selected>60 %</option><option value="80">80 %</option><option value="90">90 %</option></select> de vitalité</label>
     <div class="info dim" id="autoHealMsg">Premiers soins par le membre le plus doué qui accepte.</div>
     <h2>Partie</h2>
-    <div class="info" id="loadRow" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">Charger :</div>
+    <div class="info" id="loadRow" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"></div>
     <div class="info dim" id="bootMsg"></div>
     <h2>Son</h2>
     <div id="sound" class="info" style="display:grid;grid-template-columns:auto 1fr 3.5em;gap:4px 8px;align-items:center">
@@ -411,16 +411,12 @@
     allSavesL.addEventListener("click", e => { const b = e.target.closest("button[data-n]"); if (b) loadName(b.dataset.n); });
     document.getElementById("allSavesX").addEventListener("click", () => { allSavesEl.classList.remove("open"); Module.canvas.focus(); });
     allSavesQ.addEventListener("input", () => { const q = allSavesQ.value.trim().toLowerCase(); for (const b of allSavesL.children) b.style.display = !q || (b.dataset.n || "").toLowerCase().includes(q) ? "" : "none"; });
-    function drawLoadRow() {
-      const row = document.getElementById("loadRow"); row.textContent = "Charger : ";
-      const names = slotNames().slice(0, 4);
-      if (!names.length && !allSaveNames().length) { row.append("aucune sauvegarde"); return; }
-      names.forEach(n => {
-        const b = document.createElement("button"); b.type = "button"; b.textContent = n;
-        b.title = "Charger la sauvegarde " + n; b.addEventListener("click", () => loadName(n)); row.append(b);
-      });
-      const all = document.createElement("button"); all.type = "button"; all.textContent = `Toutes (${allSaveNames().length})…`;
-      all.title = "Afficher toutes les sauvegardes"; all.addEventListener("click", () => showAllSaves("manual")); row.append(all);
+    function drawLoadRow() {                                 // one button opening the saves dialog
+      const row = document.getElementById("loadRow"); row.textContent = "";
+      const n = allSaveNames().length;
+      if (!n) { row.append("Aucune sauvegarde."); return; }
+      const b = document.createElement("button"); b.type = "button"; b.textContent = `Charger une partie (${n})…`;
+      b.title = "Afficher toutes les sauvegardes"; b.addEventListener("click", () => showAllSaves("manual")); row.append(b);
     }
     async function inGame(ms = 15000) {                      // game loaded: the location map is readable
       const was = lastLevel && lastLevel.raw;
